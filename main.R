@@ -44,12 +44,12 @@ set.seed(239)
 # Добавление HGT_parent
 task_data <- task_data %>%
   mutate(
-    HGT_parent =
-      ifelse(
-        test = is.na(HGT_mother) | is.na(HGT_father),
-        yes = coalesce(HGT_mother, HGT_father),
-        no = (HGT_mother + HGT_father) / 2.0
-      )
+    HGT_parent = coalesce(HGT_mother, HGT_father)
+    # ifelse(
+    #   test = is.na(HGT_mother) | is.na(HGT_father),
+    #   yes = coalesce(HGT_mother, HGT_father),
+    #   no = (HGT_mother + HGT_father) / 2.0
+    # )
   )
 
 # Добавление moved
@@ -62,7 +62,8 @@ task_data <- task_data %>%
       first(SMSA_central) == 0 ~ 3,  # Переехал в город
       first(SMSA_central) == 1 ~ 4,  # Уехал из города
     )
-  ) %>% ungroup()
+  ) %>%
+  ungroup()
 
 # Расчет средних значений для каждой группы
 # means <- task_data %>%
@@ -99,7 +100,6 @@ variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_con
 # }
 
 
-
 # # end of 1 task
 
 #Добавление treatment
@@ -110,28 +110,37 @@ lm_data <- task_data %>%
     treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
   )
 lm_data <- lm_data %>%
-  filter((moved == 2 | moved == 3) &
-           years > 21
-           &
-           !is.na(cpi_w) &
-           !is.na(region) &
-           !is.na(education) &
-           !is.na(fam_size) &
-           !is.na(region) &
-           !is.na(education)
-           &
-           !is.na(class_of_work) &
-           !is.na(HGT_parent) &
-           !is.na(self_conf) &
-           !is.na(risk) &
-           !is.na(size_of_firm) &
-           !is.na(AFQT2)
-  ) %>% select(-n, -moved, -hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
-# head(lm_data, 3)
-# model <- lm(cpi_w ~ treatment, data = lm_data)
-# model_summary <- summary(model)
-# table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
-# table1
+  filter((moved == 2 | moved == 3) & years > 21) %>%
+  select(-n, -moved, -hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
+lm_data <- na.omit(lm_data)
+
+length(boxplot(lm_data$HGT_parent, main = "HGT_parent before")$out)
+length(boxplot(lm_data$education, main = "education before")$out)
+
+head(nrow(lm_data))
+lm_data <- lm_data %>%
+  filter(
+    !(HGT_parent %in% boxplot(HGT_parent)$out)
+      &
+      !(education %in% boxplot(education)$out)
+      &
+      !(size_of_firm %in% boxplot(size_of_firm)$out)
+      &
+      !(AFQT2 %in% boxplot(AFQT2)$out)
+      &
+      !(years %in% boxplot(years)$out)
+  )
+print("AFTER")
+head(nrow(lm_data))
+boxplot(lm_data$HGT_parent, main = "HGT_parent after")
+boxplot(lm_data$education, main = "education after")
+
+
+model <- lm(cpi_w ~ treatment, data = lm_data)
+model_summary <- summary(model)
+model_summary
+table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
+table1
 
 # Осмысленный вывод почему смещена
 # Из таблицы видно что баланс ковариатов не соблюдается, следовательно оценка смещена так как
@@ -151,7 +160,8 @@ m.out <- matchit(
     size_of_firm +
     self_conf +
     white +
-    woman + AFQT2,
+    woman +
+    AFQT2,
   data = lm_data,
   nearest = "optimal",
   distance = "mahalanobis",
@@ -201,21 +211,21 @@ boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный м
 #end of 5 task
 X <- model.matrix(data = lm_data, cpi_w ~
   treatment +
-  region +
-  education +
-  HGT_parent +
-  risk +
-  size_of_firm +
-  self_conf +
-  white +
-  woman + AFQT2)
+    region +
+    education +
+    HGT_parent +
+    risk +
+    size_of_firm +
+    self_conf +
+    white +
+    woman +
+    AFQT2)
 head(X, 3)
-DR<- rlassoEffects(X, lm_data$cpi_w, 2, data=lm_data)
+DR <- rlassoEffects(X, lm_data$cpi_w, 2, data = lm_data)
 # тритмент стоит на 2м месте в матрице X
 print_coef(DR) # ATE
 # confint(DR)
 summary(DR)
-
 
 
 # DR$selection.matrix #кого выкинули или оставили
@@ -239,10 +249,13 @@ summary(DR)
 
 #end of 6 task
 
-split <- sample.split(rownames(lm_data), SplitRatio = .5)
+split <- sample.split(rownames(lm_data), SplitRatio = .8)
 
 data_train_sample <- lm_data %>% subset(split == TRUE)
 data_test_sample <- lm_data %>% subset(split == FALSE)
+print("Sizez")
+print(nrow(data_test_sample))
+print(nrow(data_train_sample))
 
 data_train <- list(
   df = data_train_sample,
@@ -259,8 +272,7 @@ data_test <- list(
 )
 
 # B <- 100000 # количество деревьев - такой же результат
-B <- 10000 # количество деревьев -  норм
-B <- 1000 # количество деревьев -  норм
+B <- 10000
 tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
 tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
 
@@ -294,6 +306,75 @@ ggplot(var_imp_df, aes(x = reorder(variable, importance), y = importance)) +
   coord_flip() +
   labs(x = "Переменная", y = "Важность")
 
+hist(tau.hat$predictions, main = "Гистограмма распределения эффектов от фактора переезда")
+
+plot_data <- data.frame(
+  predicted_effect = tau.hat$predictions,
+  years = data_test$X$years,
+  self_conf = data_test$X$self_conf,
+  t = data_test$X$t,
+  size_of_firm = data_test$X$size_of_firm,
+  education = data_test$X$education,
+  AFQT2 = data_test$X$AFQT2,
+  self_conf = data_test$X$self_conf
+)
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = size_of_firm, y = predicted_effect)
+) + geom_point()
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = education, y = predicted_effect)
+) + geom_point()
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = years, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = t, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = AFQT2, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = self_conf, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+# ggplot(plot_data, aes(x = HGT_parent, y = predicted_effect)) +
+#   geom_point() +
+#   labs(x = "HGT_parent", y = "Предсказанный эффект") +
+#   ggtitle("Зависимость предсказанного эффекта от HGT_parent")
+# ggplot(data = plot_data) + geom_bar(aes(x = HGT_parent, y = predicted_effect), fill = "blue") +
+#   ggtitle("HGT_parent -> predicted_effect") +
+#   xlab("HGT_parent") +
+#   ylab("predicted_effect")
+# ggplot(plot_data, aes(x = HGT_parent, y = predicted_effect)) +
+#   geom_point() +
+#   labs(x = "Рост родителя (HGT_parent)",
+#        y = "Предсказанный эффект",
+#        title = "Зависимость предсказанного эффекта от роста родителя")
+
+# ggplot(data = data_test$X, aes(x = data_test$X$HGT_parent, y = tau.hat$predictions)) +
+#   geom_point() +
+#   geom_smooth(method = "loess") +
+#   labs(x = "HGT_parent", y = "Predictions")
 
 # key_vars <- var_imp_df$variable[1:5]
 # head(key_vars)
@@ -322,7 +403,6 @@ ggplot(var_imp_df, aes(x = reorder(variable, importance), y = importance)) +
 #
 # plot(tau.hat$predictions) # эффект для каждого наблюдения
 # summary(tau.hat$predictions)
-# hist(tau.hat$predictions) # распределение эффектов
-# plot(tau.hat$predictions ~ data_test$df$region) #в зависимости от региона
+plot(tau.hat$predictions ~ data_test$df$region, type = "S") #в зависимости от региона
 #
 # ggplot(data_test$df) + geom_boxplot(aes(factor(white), tau.hat$predictions))

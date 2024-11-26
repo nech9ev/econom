@@ -10,15 +10,13 @@
 # install.packages("WeightIt", repos = "https://cloud.r-project.org/")
 # install.packages("randomForest", repos = "https://cloud.r-project.org/")
 # install.packages("grf", repos = "https://cloud.r-project.org/")
-install.packages("caTools", repos = "https://cloud.r-project.org/")
-
+# install.packages("caTools", repos = "https://cloud.r-project.org/")
 
 library(tidyverse)
 library(dplyr)
 library(tableone)
 library(ggplot2)
 library(ggpubr)
-library(car)
 library(multcomp)
 library(readxl)
 library(broom)
@@ -32,17 +30,17 @@ library(twang)
 library(AER)
 library(tidyverse)
 library(rddensity)
-library(cobalt)
 library('WeightIt')
 library('tableone')
 library(boot)
 library(randomForest)
 library(grf)
+library(hdm)
 library(caTools)
 
 # Загрузка данных
 task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
-
+set.seed(239)
 # Добавление HGT_parent
 task_data <- task_data %>%
   mutate(
@@ -64,8 +62,7 @@ task_data <- task_data %>%
       first(SMSA_central) == 0 ~ 3,  # Переехал в город
       first(SMSA_central) == 1 ~ 4,  # Уехал из города
     )
-  ) %>%
-  ungroup()
+  ) %>% ungroup()
 
 # Расчет средних значений для каждой группы
 # means <- task_data %>%
@@ -81,7 +78,7 @@ task_data <- task_data %>%
 #   )
 # kable(means, caption = "Средние значения для каждой группы")
 
-# variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
+variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
 # pairwise_test_results <- task_data %>%
 #   gather(variable, value, all_of(variables)) %>%
 #   group_by(variable) %>%
@@ -92,7 +89,7 @@ task_data <- task_data %>%
 #     filter(variable == var) %>%
 #     select(group1, group2, p.adj)
 # }
-
+#
 #
 # for (var in variables) {
 #   table_for_var <- as.data.frame(create_table(pairwise_test_results, var))
@@ -100,7 +97,7 @@ task_data <- task_data %>%
 #   print(sprintf("p-value значения между группами moved для %s", var))
 #   print(table_for_var)
 # }
-#
+
 
 
 # # end of 1 task
@@ -127,9 +124,10 @@ lm_data <- lm_data %>%
            !is.na(HGT_parent) &
            !is.na(self_conf) &
            !is.na(risk) &
-           !is.na(size_of_firm)
-  ) %>% select(-hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
-# head(lm_data, 5)
+           !is.na(size_of_firm) &
+           !is.na(AFQT2)
+  ) %>% select(-n, -moved, -hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
+# head(lm_data, 3)
 # model <- lm(cpi_w ~ treatment, data = lm_data)
 # model_summary <- summary(model)
 # table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
@@ -153,7 +151,7 @@ m.out <- matchit(
     size_of_firm +
     self_conf +
     white +
-    woman,
+    woman + AFQT2,
   data = lm_data,
   nearest = "optimal",
   distance = "mahalanobis",
@@ -165,19 +163,20 @@ matched_data <- match.data(m.out)
 model <- lm(cpi_w ~ treatment, data = matched_data)
 summary(model)
 
-#task 7
-# effect_fun <- function(data, indices) {
-#   data <- data[indices,]
-#   model <- lm(cpi_w ~ treatment, data = data)
-#   return(coef(model)["treatment"])
-# }
-#
-# # Бутстрап
-# boot_results <- boot(data = matched_data, statistic = effect_fun, R = 1000)
-#
-# # 95% доверительный интервал
-# boot.ci(boot_results, type = "perc")
-#end of 3 task
+
+# task 7
+effect_fun <- function(data, indices) {
+  boot_sample <- data[indices,]
+  boot_model <- lm(cpi_w ~ treatment, data = boot_sample)
+  return(coef(boot_model)["treatment"]) # бутстрапируемая статистика -- оценка ATE
+}
+
+# Бутстрап
+boot_results <- boot(data = matched_data, statistic = effect_fun, R = 1000)
+
+# 95% доверительный интервал
+boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный метод построения доверительного интервала
+# end of 3 task
 
 # table1 <- CreateTableOne(vars= all_convariants, strata = "treatment", data=matched_data, test=TRUE)
 # table1
@@ -188,15 +187,39 @@ summary(model)
 
 # Модель пропенси-скора
 # propscore <- weightit(
-#   formula = treatment ~ children + fam_size + married + region + years + class_of_work + education + HGT_parent + risk + size_of_firm + self_conf + white + woman,
+#   formula = treatment ~ children + fam_size + married + region,
 #   data = lm_data,
 #   estimand = 'ATT',
 #   method = 'ps',
 # )
+# head(lm_data, 100000)
+# summary(propscore)
+# head(propscore$weights, 10)
 # result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
 # summary(result)
 
 #end of 5 task
+X <- model.matrix(data = lm_data, cpi_w ~
+  treatment +
+  region +
+  education +
+  HGT_parent +
+  risk +
+  size_of_firm +
+  self_conf +
+  white +
+  woman + AFQT2)
+head(X, 3)
+DR<- rlassoEffects(X, lm_data$cpi_w, 2, data=lm_data)
+# тритмент стоит на 2м месте в матрице X
+print_coef(DR) # ATE
+# confint(DR)
+summary(DR)
+
+
+
+# DR$selection.matrix #кого выкинули или оставили
+# DR$coef.mat #вывести все коэффициенты
 # Y <- lm_data$cpi_w
 # head(Y, 5)
 # X <- model.matrix(data = lm_data, cpi_w ~ 0 +
@@ -216,40 +239,39 @@ summary(model)
 
 #end of 6 task
 
-set.seed(239)  # Для воспроизводимости результатов
 split <- sample.split(rownames(lm_data), SplitRatio = .5)
 
-data_train <- lm_data %>% subset(split == TRUE)
-data_test <- lm_data %>% subset(split == FALSE)
-
-head(data_train)
+data_train_sample <- lm_data %>% subset(split == TRUE)
+data_test_sample <- lm_data %>% subset(split == FALSE)
 
 data_train <- list(
-  df = data_train,
-  Y = data_train$cpi_w,
-  W = data_train$treatment,
-  X = data_train %>% select(-cpi_w, -treatment)
+  df = data_train_sample,
+  Y = data_train_sample$cpi_w,
+  W = data_train_sample$treatment,
+  X = data_train_sample %>% select(-cpi_w, -treatment)
 )
 
 data_test <- list(
-  df = data_test,
-  Y = data_test$cpi_w,
-  W = data_test$treatment,
-  X = data_test %>% select(-cpi_w, -treatment)
+  df = data_test_sample,
+  Y = data_test_sample$cpi_w,
+  W = data_test_sample$treatment,
+  X = data_test_sample %>% select(-cpi_w, -treatment)
 )
 
-B <- 1000 # количество деревьев
+# B <- 100000 # количество деревьев - такой же результат
+B <- 10000 # количество деревьев -  норм
+B <- 1000 # количество деревьев -  норм
 tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
 tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
-tau.hat # прогноз HTE и его дисперсии
 
 # Построим 95%-й доверительный интервал для оценок
-head(tau.hat$predictions) # вектор оценок HTE
-head(tau.hat$variance.estimates) # вектор дисперсий оценок HTE
+# head(tau.hat$predictions, 2) # вектор оценок HTE
+# head(tau.hat$variance.estimates, 2) # вектор дисперсий оценок HTE
 
+sigma.hat <- sqrt(tau.hat$variance.estimates)
 CI <- list(
-  L = tau.hat$predictions + qnorm(0.05) * sqrt(tau.hat$variance.estimates), # нижняя граница
-  U = tau.hat$predictions + qnorm(0.95) * sqrt(tau.hat$variance.estimates) # верхняя граница
+  L = tau.hat$predictions - qnorm(0.95) * sigma.hat, # нижняя граница
+  U = tau.hat$predictions + qnorm(0.95) * sigma.hat # верхняя граница
 )
 
 D <- data.frame( # объединим все в табличку
@@ -257,25 +279,50 @@ D <- data.frame( # объединим все в табличку
   CI_lower_bound = CI$L,
   CI_upper_bound = CI$U
 )
-head(D)
+head(D, 3)
 
-head(average_treatment_effect(tau.forest, target.sample = "treated"))
+var_imp <- variable_importance(tau.forest)
+var_imp[is.na(var_imp)] <- 0
+names <- colnames(data_test$X)
+head(var_imp, 20)
+head(names, 20)
+var_imp_df <- data.frame(importance = var_imp, variable = names) %>% arrange(desc(importance))
+var_imp_df
 
-# head(variable_importance(tau.forest)) # какой вклад (доля объясненной дисперсии) вносит каждая переменная в гетерогенность эффекта
-
-tau.forest %>% # таблица с вкладом каждой переменной
-  variable_importance() %>%
-  as.data.frame() %>%
-  mutate(variable = colnames(tau.forest$X.orig)) %>%
-  arrange(desc(V1))
+ggplot(var_imp_df, aes(x = reorder(variable, importance), y = importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(x = "Переменная", y = "Важность")
 
 
+# key_vars <- var_imp_df$variable[1:5]
+# head(key_vars)
+# for (var in key_vars) {
+#   ggplot(data = data_testt, aes(x = .data[[var]], y = tau.hat$predictions)) +
+#     geom_point() +
+#     geom_smooth(method = "loess") +
+#     labs(x = var, y = "HTE")
+# }
+
+# plot(variable_importance(tau.forest))
+
+# head(average_treatment_effect(tau.forest, target.sample = "treated"))
+#
+# # head(variable_importance(tau.forest)) # какой вклад (доля объясненной дисперсии) вносит каждая переменная в гетерогенность эффекта
+#
+# tau.forest %>% # таблица с вкладом каждой переменной
+#   variable_importance() %>%
+#   as.data.frame() %>%
+#   mutate(variable = colnames(tau.forest$X.orig)) %>%
+#   arrange(desc(V1))
+#
+#
 # mean(as.numeric(CI$U<0)) # для 44% тестовой выборки эффект значимый отрицательный (B=10000)
 # mean(as.numeric(CI$L>0)) # для 2,5% тестовой выборки эффект значимый положительный
-
-plot(tau.hat$predictions) # эффект для каждого наблюдения
-summary(tau.hat$predictions)
-hist(tau.hat$predictions) # распределение эффектов
-plot(tau.hat$predictions ~ data_test$df$region) #в зависимости от региона
-
-ggplot(data_test$df) + geom_boxplot(aes(factor(white), tau.hat$predictions))
+#
+# plot(tau.hat$predictions) # эффект для каждого наблюдения
+# summary(tau.hat$predictions)
+# hist(tau.hat$predictions) # распределение эффектов
+# plot(tau.hat$predictions ~ data_test$df$region) #в зависимости от региона
+#
+# ggplot(data_test$df) + geom_boxplot(aes(factor(white), tau.hat$predictions))

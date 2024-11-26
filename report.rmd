@@ -1,0 +1,309 @@
+---
+title: "Домашнее задание №2"
+author: "Хейфец Владислава Евгеньевна"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+## Установка библиотек:
+```{r, message = FALSE, warning=FALSE}
+# install.packages(c("readxl", "tidyverse", "dplyr", "ggplot2", "ggpubr", "car", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
+# install.packages("tableone", repos = "https://cloud.r-project.org/")
+# install.packages("MatchIt", repos = "https://cloud.r-project.org/")
+# install.packages("glmnet", repos = "https://cloud.r-project.org/")
+# install.packages("twang", repos = "https://cloud.r-project.org/")
+# install.packages("AER", repos = "https://cloud.r-project.org/")
+# install.packages("rddensity", repos = "https://cloud.r-project.org/")
+# install.packages("cobalt", repos = "https://cloud.r-project.org/")
+# install.packages("WeightIt", repos = "https://cloud.r-project.org/")
+# install.packages("randomForest", repos = "https://cloud.r-project.org/")
+# install.packages("grf", repos = "https://cloud.r-project.org/")
+# install.packages("caTools", repos = "https://cloud.r-project.org/")
+
+library(tidyverse)
+library(dplyr)
+library(tableone)
+library(ggplot2)
+library(ggpubr)
+library(car)
+library(multcomp)
+library(readxl)
+library(broom)
+library(gridExtra)
+library(rstatix)
+library(readxl)
+library(knitr)
+library("MatchIt")
+library(glmnet)
+library(twang)
+library(AER)
+library(tidyverse)
+library(rddensity)
+library(cobalt)
+library('WeightIt')
+library('tableone')
+library(boot)
+library(randomForest)
+library(grf)
+library(caTools)
+```
+
+## Загрузка данных и предобработка
+```{r}
+task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
+task_data <- task_data %>%
+  mutate(
+    HGT_parent =
+      ifelse(
+        test = is.na(HGT_mother) | is.na(HGT_father),
+        yes = coalesce(HGT_mother, HGT_father),
+        no = (HGT_mother + HGT_father) / 2.0
+      )
+  )
+
+# Добавление moved
+task_data <- task_data %>%
+  group_by(n) %>%
+  mutate(
+    moved = case_when(
+      all(SMSA_central == 1) ~ 1,  # Всегда жил в городе
+      all(SMSA_central == 0) ~ 2,  # Всегда жил вне города
+      first(SMSA_central) == 0 ~ 3,  # Переехал в город
+      first(SMSA_central) == 1 ~ 4,  # Уехал из города
+    )
+  ) %>%
+  ungroup()
+
+set.seed(239)
+head(task_data, 1)
+
+```
+
+# Задание 1
+## Расчет средних значений для каждой группы
+```{r}
+head(task_data)
+means <- task_data %>%
+  group_by(moved) %>%
+  summarize(
+    mean_fam_size = mean(fam_size, na.rm = TRUE),
+    mean_class_of_work = mean(class_of_work, na.rm = TRUE),
+    mean_education = mean(education, na.rm = TRUE),
+    mean_HGT_parent = mean(HGT_parent, na.rm = TRUE),
+    mean_self_conf = mean(self_conf, na.rm = TRUE),
+    mean_size_of_firm = mean(size_of_firm, na.rm = TRUE),
+    mean_risk = mean(risk, na.rm = TRUE),
+  )
+kable(means, caption = "Средние значения для каждой группы")
+```
+
+
+## Расчет средних значений для каждой группы
+```{r}
+variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
+pairwise_test_results <- task_data %>%
+  gather(variable, value, all_of(variables)) %>%
+  group_by(variable) %>%
+  pairwise_wilcox_test(value ~ moved, p.adjust.method = "bonferroni")
+
+create_table <- function(df, var) {
+  df %>%
+    filter(variable == var) %>%
+    select(group1, group2, p.adj)
+}
+
+
+for (var in variables) {
+  table_for_var <- as.data.frame(create_table(pairwise_test_results, var))
+  cat("\n\n")
+  print(sprintf("p-value значения между группами moved для %s", var))
+  print(table_for_var)
+}
+```
+
+# Задание 2
+### Оценку эффекта переезда на зарплату с помощью парной регрессии
+```{r}
+all_convariants <- c("children", "fam_size", "married", "region", "years", "class_of_work", "education", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
+lm_data <- task_data %>%
+  mutate(
+    treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
+  )
+lm_data <- lm_data %>%
+  filter((moved == 2 | moved == 3) &
+           years > 21
+           &
+           !is.na(cpi_w) &
+           !is.na(region) &
+           !is.na(education) &
+           !is.na(fam_size) &
+           !is.na(region) &
+           !is.na(education)
+           &
+           !is.na(class_of_work) &
+           !is.na(HGT_parent) &
+           !is.na(self_conf) &
+           !is.na(risk) &
+           !is.na(size_of_firm)
+  ) %>% select(-hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
+head(lm_data, 2)
+model <- lm(cpi_w ~ treatment, data = lm_data)
+model_summary <- summary(model)
+table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
+table1
+```
+
+Осмысленный вывод почему смещена
+Из таблицы видно что баланс ковариатов не соблюдается, следовательно оценка смещена так как между группами есть статистически значимое различие
+
+
+# Задание 3
+### Оценка эффекта переезда на зарплату мэтчингом
+```{r}
+m.out <- matchit(
+  formula = treatment ~ children +
+    fam_size +
+    married +
+    region +
+    years +
+    class_of_work +
+    education +
+    HGT_parent +
+    risk +
+    size_of_firm +
+    self_conf +
+    white +
+    woman,
+  data = lm_data,
+  nearest = "optimal",
+  distance = "mahalanobis",
+  estimand = 'ATT'
+)
+summary(m.out)
+plot(m.out)
+matched_data <- match.data(m.out)
+model <- lm(cpi_w ~ treatment, data = matched_data)
+summary(model)
+```
+
+# Задание 7
+### 95%-ный бутстраповский доверительные интервал
+```{r}
+effect_fun <- function(data, indices) {
+  boot_sample <- data[indices,]
+  boot_model <- lm(cpi_w ~ treatment, data = boot_sample)
+  return(coef(boot_model)["treatment"]) # бутстрапируемая статистика -- оценка ATE
+}
+
+# Бутстрап
+boot_results <- boot(data = matched_data, statistic = effect_fun, R = 1000)
+
+# 95% доверительный интервал
+boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный метод построения доверительного интервала
+```
+
+# Задание 4
+### Таблица с балансом ковариатов после процедуры мэтчинга
+```{r}
+table1 <- CreateTableOne(vars= all_convariants, strata = "treatment", data=matched_data, test=TRUE)
+table1
+```
+Вывод что при матчинге лучше соблюдается баланс ковариатов и оценка ATE лучше
+Баланс ковариатов улучшился при матчинге
+
+# Задание 5
+### Оценка эффекта переезда на заработную плату методом inverse probability weighting на основе propensity score
+```{r}
+propscore <- weightit(
+  formula = treatment ~ children + fam_size + married + region + years + class_of_work + education + HGT_parent + risk + size_of_firm + self_conf + white + woman,
+  data = lm_data,
+  estimand = 'ATT',
+  method = 'ps',
+)
+result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
+summary(result)
+```
+
+
+# Задание 6
+### Эффект от переезда на заработную плату с использованием отбора контрольных переменных методом DR LASSO
+```{r}
+propscore <- weightit(
+  formula = treatment ~ children + fam_size + married + region + years + class_of_work + education + HGT_parent + risk + size_of_firm + self_conf + white + woman,
+  data = lm_data,
+  estimand = 'ATT',
+  method = 'ps',
+)
+result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
+summary(result)
+```
+
+# Задание 8
+### Оценка эффекта от переезда на заработную плату методом причинного случайного леса
+```{r}
+set.seed(239)  # Для воспроизводимости результатов
+split <- sample.split(rownames(lm_data), SplitRatio = .5)
+
+data_train <- lm_data %>% subset(split == TRUE)
+data_test <- lm_data %>% subset(split == FALSE)
+
+head(data_train)
+
+data_train <- list(
+  df = data_train,
+  Y = data_train$cpi_w,
+  W = data_train$treatment,
+  X = data_train %>% select(-cpi_w, -treatment)
+)
+
+data_test <- list(
+  df = data_test,
+  Y = data_test$cpi_w,
+  W = data_test$treatment,
+  X = data_test %>% select(-cpi_w, -treatment)
+)
+
+B <- 1000 # количество деревьев
+tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
+tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
+head(tau.hat) # прогноз HTE и его дисперсии
+
+# Построим 95%-й доверительный интервал для оценок
+head(tau.hat$predictions) # вектор оценок HTE
+head(tau.hat$variance.estimates) # вектор дисперсий оценок HTE
+
+CI <- list(
+  L = tau.hat$predictions + qnorm(0.05) * sqrt(tau.hat$variance.estimates), # нижняя граница
+  U = tau.hat$predictions + qnorm(0.95) * sqrt(tau.hat$variance.estimates) # верхняя граница
+)
+
+D <- data.frame( # объединим все в табличку
+  predicted_effect = tau.hat$predictions,
+  CI_lower_bound = CI$L,
+  CI_upper_bound = CI$U
+)
+head(D)
+
+head(average_treatment_effect(tau.forest, target.sample = "treated"))
+
+# head(variable_importance(tau.forest)) # какой вклад (доля объясненной дисперсии) вносит каждая переменная в гетерогенность эффекта
+
+tau.forest %>% # таблица с вкладом каждой переменной
+  variable_importance() %>%
+  as.data.frame() %>%
+  mutate(variable = colnames(tau.forest$X.orig)) %>%
+  arrange(desc(V1))
+
+
+# mean(as.numeric(CI$U<0)) # для 44% тестовой выборки эффект значимый отрицательный (B=10000)
+# mean(as.numeric(CI$L>0)) # для 2,5% тестовой выборки эффект значимый положительный
+
+plot(tau.hat$predictions) # эффект для каждого наблюдения
+summary(tau.hat$predictions)
+hist(tau.hat$predictions) # распределение эффектов
+plot(tau.hat$predictions ~ data_test$df$region) #в зависимости от региона
+
+ggplot(data_test$df) + geom_boxplot(aes(factor(white), tau.hat$predictions))
+```
+
+

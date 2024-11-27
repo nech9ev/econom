@@ -3,8 +3,6 @@
 # install.packages("MatchIt", repos = "https://cloud.r-project.org/")
 # install.packages("glmnet", repos = "https://cloud.r-project.org/")
 # install.packages("rddensity", repos = "https://cloud.r-project.org/")
-# install.packages("sandwich", repos = "https://cloud.r-project.org/")
-# install.packages("cobalt", repos = "https://cloud.r-project.org/")
 # install.packages("WeightIt", repos = "https://cloud.r-project.org/")
 # install.packages("grf", repos = "https://cloud.r-project.org/")
 # install.packages("caTools", repos = "https://cloud.r-project.org/")
@@ -40,6 +38,18 @@ task_data <- task_data %>%
     HGT_parent = coalesce(HGT_mother, HGT_father)
   )
 
+task_data <- task_data %>%
+  filter(
+    !(HGT_parent %in% boxplot(HGT_parent)$out)
+      &
+      !(education %in% boxplot(education)$out)
+      &
+      !(size_of_firm %in% boxplot(size_of_firm)$out)
+      &
+      !(AFQT2 %in% boxplot(AFQT2)$out)
+      &
+      !(years %in% boxplot(years)$out)
+  )
 # Добавление moved
 task_data <- task_data %>%
   group_by(n) %>%
@@ -50,24 +60,22 @@ task_data <- task_data %>%
       first(SMSA_central) == 0 ~ 3,  # Переехал в город
       first(SMSA_central) == 1 ~ 4,  # Уехал из города
     )
-  ) %>%
-  ungroup()
+  ) %>% ungroup()
 
 # Расчет средних значений для каждой группы
 means <- task_data %>%
   group_by(moved) %>%
   summarize(
-    mean_fam_size = mean(fam_size, na.rm = TRUE),
-    mean_class_of_work = mean(class_of_work, na.rm = TRUE),
-    mean_education = mean(education, na.rm = TRUE),
-    mean_HGT_parent = mean(HGT_parent, na.rm = TRUE),
-    mean_self_conf = mean(self_conf, na.rm = TRUE),
-    mean_size_of_firm = mean(size_of_firm, na.rm = TRUE),
-    mean_risk = mean(risk, na.rm = TRUE),
+    m_fam_size = mean(fam_size, na.rm = TRUE),
+    m_education = mean(education, na.rm = TRUE),
+    m_HGT_parent = mean(HGT_parent, na.rm = TRUE),
+    m_self_conf = mean(self_conf, na.rm = TRUE),
+    m_size_of_firm = mean(size_of_firm, na.rm = TRUE),
+    m_risk = mean(risk, na.rm = TRUE),
   )
 kable(means, caption = "Средние значения для каждой группы")
 
-variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
+variables <- c("fam_size", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
 pairwise_test_results <- task_data %>%
   gather(variable, value, all_of(variables)) %>%
   group_by(variable) %>%
@@ -79,12 +87,11 @@ create_table <- function(df, var) {
     select(group1, group2, p.adj)
 }
 
-
 for (var in variables) {
-  table_for_var <- create_table(pairwise_test_results, var)
+  data <- as.data.frame(create_table(pairwise_test_results, var))
   cat("\n")
-  print(sprintf("p-value значения между группами moved для %s", var))
-  print(table_for_var)
+  print(sprintf("p-value между группами для %s", var))
+  print(data)
 }
 
 # # end of 1 task
@@ -145,7 +152,6 @@ m.out <- matchit(
   estimand = 'ATT'
 )
 summary(m.out)
-plot(m.out)
 matched_data <- match.data(m.out)
 model <- lm(cpi_w ~ treatment, data = matched_data)
 summary(model)

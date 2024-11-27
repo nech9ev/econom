@@ -1,33 +1,27 @@
 ---
 title: "Домашнее задание №2"
 author: "Хейфец Владислава Евгеньевна"
-date: "`r Sys.Date()`"
-output: html_document
+date: "27 ноября 2024 года"
+output: rmarkdown::html_vignette
 ---
 
 
-## Установка библиотек:
+## Установка библиотек
 ```{r, message = FALSE, warning=FALSE}
-# install.packages(
-# c("readxl", "tidyverse", "dplyr", "ggplot2", "ggpubr", "car", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
+# install.packages(c("readxl", "tidyverse", "dplyr", "ggplot2", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
 # install.packages("tableone", repos = "https://cloud.r-project.org/")
 # install.packages("MatchIt", repos = "https://cloud.r-project.org/")
 # install.packages("glmnet", repos = "https://cloud.r-project.org/")
-# install.packages("twang", repos = "https://cloud.r-project.org/")
-# install.packages("AER", repos = "https://cloud.r-project.org/")
 # install.packages("rddensity", repos = "https://cloud.r-project.org/")
-# install.packages("cobalt", repos = "https://cloud.r-project.org/")
 # install.packages("WeightIt", repos = "https://cloud.r-project.org/")
-# install.packages("randomForest", repos = "https://cloud.r-project.org/")
 # install.packages("grf", repos = "https://cloud.r-project.org/")
 # install.packages("caTools", repos = "https://cloud.r-project.org/")
+# install.packages("stargazer", repos = "https://cloud.r-project.org/")
 
 library(tidyverse)
 library(dplyr)
 library(tableone)
 library(ggplot2)
-library(ggpubr)
-library(car)
 library(multcomp)
 library(readxl)
 library(broom)
@@ -37,22 +31,55 @@ library(readxl)
 library(knitr)
 library("MatchIt")
 library(glmnet)
-library(twang)
-library(AER)
 library(tidyverse)
 library(rddensity)
-library(cobalt)
 library('WeightIt')
 library('tableone')
 library(boot)
-library(randomForest)
 library(grf)
+library(hdm)
 library(caTools)
 ```
 
-## Загрузка данных и предобработка
+### Загрузка данных
 ```{r}
+
 task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
+set.seed(239)
+head(task_data, 1)
+
+```
+
+## Задание 1
+### Разделение на 4 группы
+Добавлю колонку moved, которая будет содержать числа от 1 до 4.
+Каждое число кодируют факт о респонденте
+
+1. Всегда жил в городе
+2. Всегда жил вне города
+3. Переехал в город
+4. Уехал из города
+
+```{r}
+task_data <- task_data %>%
+  group_by(n) %>%
+  mutate(
+    moved = case_when(
+      all(SMSA_central == 1) ~ 1,
+      all(SMSA_central == 0) ~ 2,
+      first(SMSA_central) == 0 ~ 3,
+      first(SMSA_central) == 1 ~ 4,
+    )
+  ) %>%
+  ungroup()
+
+head(task_data, 1)
+```
+
+Добавлю недостающий параметр: образование родителей
+
+если нет данных об образовании матери либо отца, беру значение образования родителя данные о котором есть
+```{r}
 task_data <- task_data %>%
   mutate(
     HGT_parent =
@@ -62,39 +89,33 @@ task_data <- task_data %>%
         no = (HGT_mother + HGT_father) / 2.0
       )
   )
-
-# Добавление moved
 task_data <- task_data %>%
-  group_by(n) %>%
-  mutate(
-    moved = case_when(
-      all(SMSA_central == 1) ~ 1,  # Всегда жил в городе
-      all(SMSA_central == 0) ~ 2,  # Всегда жил вне города
-      first(SMSA_central) == 0 ~ 3,  # Переехал в город
-      first(SMSA_central) == 1 ~ 4,  # Уехал из города
-    )
-  ) %>%
-  ungroup()
-
-set.seed(239)
+  filter(
+    !(HGT_parent %in% boxplot(HGT_parent)$out)
+  )
 head(task_data, 1)
-
 ```
 
-# Задание 1
-## Расчет средних значений для каждой группы
+## Cредние значения для каждой группы
+1. Размер семьи
+2. Способности
+3. Образование
+4. Образование родителей
+5. Уверенность в себе
+6. Размер фирмы
+7. Отношение к риску
+
 ```{r}
-head(task_data)
 means <- task_data %>%
   group_by(moved) %>%
   summarize(
-    mean_fam_size = mean(fam_size, na.rm = TRUE),
-    mean_class_of_work = mean(class_of_work, na.rm = TRUE),
-    mean_education = mean(education, na.rm = TRUE),
-    mean_HGT_parent = mean(HGT_parent, na.rm = TRUE),
-    mean_self_conf = mean(self_conf, na.rm = TRUE),
-    mean_size_of_firm = mean(size_of_firm, na.rm = TRUE),
-    mean_risk = mean(risk, na.rm = TRUE),
+    m_fam_size = mean(fam_size, na.rm = TRUE),
+    m_AFQT2 = mean(AFQT2, na.rm = TRUE),
+    m_education = mean(education, na.rm = TRUE),
+    m_HGT_parent = mean(HGT_parent, na.rm = TRUE),
+    m_self_conf = mean(self_conf, na.rm = TRUE),
+    m_size_of_firm = mean(size_of_firm, na.rm = TRUE),
+    m_risk = mean(risk, na.rm = TRUE),
   )
 kable(means, caption = "Средние значения для каждой группы")
 ```
@@ -102,7 +123,7 @@ kable(means, caption = "Средние значения для каждой гр
 
 ## Расчет средних значений для каждой группы
 ```{r}
-variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
+variables <- c("fam_size", "AFQT2", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
 pairwise_test_results <- task_data %>%
   gather(variable, value, all_of(variables)) %>%
   group_by(variable) %>%
@@ -116,48 +137,70 @@ create_table <- function(df, var) {
 
 
 for (var in variables) {
-  table_for_var <- as.data.frame(create_table(pairwise_test_results, var))
-  cat("\n\n")
-  print(sprintf("p-value значения между группами moved для %s", var))
-  print(table_for_var)
+  data <- as.data.frame(create_table(pairwise_test_results, var))
+  cat("\n")
+  print(sprintf("p-value между группами для %s", var))
+  print(data)
 }
 ```
 
+
 # Задание 2
-### Оценку эффекта переезда на зарплату с помощью парной регрессии
+
+### Выделю `treatment` группу и удалю не нужные группы `moved`
+`(moved == 3 & SMSA_central == 1)` - человек переехал в крупный город
+`moved == 2` - человек всегда жил в маленьком городе
 ```{r}
-all_convariants <- c("children", "fam_size", "married", "region", "years", "class_of_work", "education", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
-lm_data <- task_data %>%
+task_data <- task_data %>%
   mutate(
     treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
   )
-lm_data <- lm_data %>%
-  filter((moved == 2 | moved == 3) &
-           years > 21
-           &
-           !is.na(cpi_w) &
-           !is.na(region) &
-           !is.na(education) &
-           !is.na(fam_size) &
-           !is.na(region) &
-           !is.na(education)
-           &
-           !is.na(class_of_work) &
-           !is.na(HGT_parent) &
-           !is.na(self_conf) &
-           !is.na(risk) &
-           !is.na(size_of_firm)
-  ) %>% select(-hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
-head(lm_data, 2)
-model <- lm(cpi_w ~ treatment, data = lm_data)
-model_summary <- summary(model)
-table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
-table1
+
+task_data <- task_data %>%
+  filter((moved == 2 | moved == 3) & years > 21)
+task_data <- task_data %>%
+  filter(
+    !(HGT_parent %in% boxplot(HGT_parent)$out)
+      &
+      !(education %in% boxplot(education)$out)
+      &
+      !(size_of_firm %in% boxplot(size_of_firm)$out)
+      &
+      !(AFQT2 %in% boxplot(AFQT2)$out)
+      &
+      !(years %in% boxplot(years)$out)
+  )
+
+head(task_data, 1)
+```
+
+Удалю пустые значения из `task_data`
+```{r}
+task_data <- na.omit(task_data)
+nrow(task_data)
+```
+Избавлюсь от лишних колонок, которые не будут использоваться в заданиях,
+дублируют другие колонки, или не несет смысловой нагрузки в рамках датасета
+```{r}
+task_data <- task_data %>%
+  select(
+          -n, -moved, -hours, -av_central_SMSA, -SMSA_central,
+          -not_central_SMSA, -SMSA_not, -urban, -wage,
+          -HGT_father, -HGT_mother, -sample_id_79, -union, -black
+  )
+head(task_data, 1)
+```
+
+### Оценка эффекта переезда на зарплату с помощью парной регрессии
+```{r}
+all_convariants <- c("children", "fam_size", "AFQT2", "married", "region", "years", "class_of_work", "education", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
+model <- lm(cpi_w ~ treatment, data = task_data)
+summary(model)
+CreateTableOne(vars = all_convariants, strata = "treatment", data = task_data, test = TRUE)
 ```
 
 Осмысленный вывод почему смещена
 Из таблицы видно что баланс ковариатов не соблюдается, следовательно оценка смещена так как между группами есть статистически значимое различие
-
 
 # Задание 3
 ### Оценка эффекта переезда на зарплату мэтчингом
@@ -165,6 +208,7 @@ table1
 m.out <- matchit(
   formula = treatment ~ children +
     fam_size +
+    AFQT2 +
     married +
     region +
     years +
@@ -176,53 +220,60 @@ m.out <- matchit(
     self_conf +
     white +
     woman,
-  data = lm_data,
+  data = task_data,
   nearest = "optimal",
   distance = "mahalanobis",
   estimand = 'ATT'
 )
-summary(m.out)
-plot(m.out)
 matched_data <- match.data(m.out)
 model <- lm(cpi_w ~ treatment, data = matched_data)
 summary(model)
 ```
 
 # Задание 7
-### 95%-ный бутстраповский доверительные интервал
+### 95%-ный бутстраповский доверительный интервал
 ```{r}
 effect_fun <- function(data, indices) {
   boot_sample <- data[indices,]
   boot_model <- lm(cpi_w ~ treatment, data = boot_sample)
-  return(coef(boot_model)["treatment"]) # бутстрапируемая статистика -- оценка ATE
+  return(coef(boot_model)["treatment"])
 }
-
-# Бутстрап
 boot_results <- boot(data = matched_data, statistic = effect_fun, R = 1000)
-
-# 95% доверительный интервал
 boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный метод построения доверительного интервала
 ```
 
 # Задание 4
 ### Таблица с балансом ковариатов после процедуры мэтчинга
 ```{r}
-table1 <- CreateTableOne(vars= all_convariants, strata = "treatment", data=matched_data, test=TRUE)
+table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = matched_data, test = TRUE)
 table1
 ```
-Вывод что при матчинге лучше соблюдается баланс ковариатов и оценка ATE лучше
+Вывод что при матчинге лучше соблюдается баланс ковариатов и оценка лучше
 Баланс ковариатов улучшился при матчинге
 
 # Задание 5
 ### Оценка эффекта переезда на заработную плату методом inverse probability weighting на основе propensity score
 ```{r}
 propscore <- weightit(
-  formula = treatment ~ children + fam_size + married + region + years + class_of_work + education + HGT_parent + risk + size_of_firm + self_conf + white + woman,
-  data = lm_data,
+  formula = treatment ~ children +
+    fam_size +
+    AFQT2 +
+    married +
+    region +
+    years +
+    class_of_work +
+    education +
+    HGT_parent +
+    risk +
+    size_of_firm +
+    self_conf +
+    white +
+    woman,
+  data = task_data,
   estimand = 'ATT',
   method = 'ps',
 )
-result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
+result <- lm(cpi_w ~ treatment, data = task_data, weights = propscore$weights)
 summary(result)
 ```
 
@@ -230,82 +281,134 @@ summary(result)
 # Задание 6
 ### Эффект от переезда на заработную плату с использованием отбора контрольных переменных методом DR LASSO
 ```{r}
-propscore <- weightit(
-  formula = treatment ~ children + fam_size + married + region + years + class_of_work + education + HGT_parent + risk + size_of_firm + self_conf + white + woman,
-  data = lm_data,
-  estimand = 'ATT',
-  method = 'ps',
+X <- model.matrix(data = task_data, cpi_w ~
+  treatment +
+    region +
+    education +
+    HGT_parent +
+    risk +
+    size_of_firm +
+    self_conf +
+    white +
+    woman +
+    AFQT2
 )
-result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
-summary(result)
+head(X, 1)
+DR <- rlassoEffects(X, task_data$cpi_w, 2, data = task_data)
+print_coef(DR)
 ```
 
 # Задание 8
 ### Оценка эффекта от переезда на заработную плату методом причинного случайного леса
 ```{r}
-set.seed(239)  # Для воспроизводимости результатов
-split <- sample.split(rownames(lm_data), SplitRatio = .5)
+split <- sample.split(rownames(task_data), SplitRatio = .8)
 
-data_train <- lm_data %>% subset(split == TRUE)
-data_test <- lm_data %>% subset(split == FALSE)
-
-head(data_train)
+data_train_sample <- task_data %>% subset(split == TRUE)
+data_test_sample <- task_data %>% subset(split == FALSE)
+print(nrow(data_test_sample))
+print(nrow(data_train_sample))
 
 data_train <- list(
-  df = data_train,
-  Y = data_train$cpi_w,
-  W = data_train$treatment,
-  X = data_train %>% select(-cpi_w, -treatment)
+  df = data_train_sample,
+  Y = data_train_sample$cpi_w,
+  W = data_train_sample$treatment,
+  X = data_train_sample %>% select(-cpi_w, -treatment)
 )
 
 data_test <- list(
-  df = data_test,
-  Y = data_test$cpi_w,
-  W = data_test$treatment,
-  X = data_test %>% select(-cpi_w, -treatment)
+  df = data_test_sample,
+  Y = data_test_sample$cpi_w,
+  W = data_test_sample$treatment,
+  X = data_test_sample %>% select(-cpi_w, -treatment)
 )
+head(data_train$X, 3)
 
-B <- 1000 # количество деревьев
+B <- 100000 # количество деревьев - такой-же результат
+# B <- 10000
 tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
 tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
-head(tau.hat) # прогноз HTE и его дисперсии
 
 # Построим 95%-й доверительный интервал для оценок
-head(tau.hat$predictions) # вектор оценок HTE
-head(tau.hat$variance.estimates) # вектор дисперсий оценок HTE
+# tau.hat$predictions - вектор оценок HTE
+# tau.hat$variance.estimates - вектор дисперсий оценок HTE
 
+sigma.hat <- sqrt(tau.hat$variance.estimates)
 CI <- list(
-  L = tau.hat$predictions + qnorm(0.05) * sqrt(tau.hat$variance.estimates), # нижняя граница
-  U = tau.hat$predictions + qnorm(0.95) * sqrt(tau.hat$variance.estimates) # верхняя граница
+  L = tau.hat$predictions - qnorm(0.95) * sigma.hat,
+  U = tau.hat$predictions + qnorm(0.95) * sigma.hat
 )
 
-D <- data.frame( # объединим все в табличку
+D <- data.frame(
   predicted_effect = tau.hat$predictions,
   CI_lower_bound = CI$L,
   CI_upper_bound = CI$U
 )
-head(D)
+head(D, 3)
 
-head(average_treatment_effect(tau.forest, target.sample = "treated"))
+var_imp <- variable_importance(tau.forest)
+var_imp[is.na(var_imp)] <- 0
+var_imp_df <- data.frame(
+  importance = var_imp,
+  variable = colnames(data_test$X)
+) %>% arrange(desc(importance))
+var_imp_df
 
-# head(variable_importance(tau.forest)) # какой вклад (доля объясненной дисперсии) вносит каждая переменная в гетерогенность эффекта
+ggplot(var_imp_df, aes(x = reorder(variable, importance), y = importance)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  labs(x = "Переменная", y = "Важность")
 
-tau.forest %>% # таблица с вкладом каждой переменной
-  variable_importance() %>%
-  as.data.frame() %>%
-  mutate(variable = colnames(tau.forest$X.orig)) %>%
-  arrange(desc(V1))
+hist(tau.hat$predictions, main = "Гистограмма распределения эффектов от фактора переезда")
 
+plot_data <- data.frame(
+  predicted_effect = tau.hat$predictions,
+  years = data_test$X$years,
+  self_conf = data_test$X$self_conf,
+  t = data_test$X$t,
+  size_of_firm = data_test$X$size_of_firm,
+  education = data_test$X$education,
+  AFQT2 = data_test$X$AFQT2,
+  self_conf = data_test$X$self_conf
+)
 
-# mean(as.numeric(CI$U<0)) # для 44% тестовой выборки эффект значимый отрицательный (B=10000)
-# mean(as.numeric(CI$L>0)) # для 2,5% тестовой выборки эффект значимый положительный
+ggplot(
+  data = plot_data,
+  mapping = aes(x = size_of_firm, y = predicted_effect)
+) + geom_point()
 
-plot(tau.hat$predictions) # эффект для каждого наблюдения
-summary(tau.hat$predictions)
-hist(tau.hat$predictions) # распределение эффектов
-plot(tau.hat$predictions ~ data_test$df$region) #в зависимости от региона
+ggplot(
+  data = plot_data,
+  mapping = aes(x = education, y = predicted_effect)
+) + geom_point()
 
-ggplot(data_test$df) + geom_boxplot(aes(factor(white), tau.hat$predictions))
+ggplot(
+  data = plot_data,
+  mapping = aes(x = years, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = t, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = AFQT2, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+
+ggplot(
+  data = plot_data,
+  mapping = aes(x = self_conf, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+plot(tau.hat$predictions ~ data_test$df$region, type = "S")
 ```
 
 

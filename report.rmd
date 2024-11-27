@@ -5,9 +5,11 @@ date: "`r Sys.Date()`"
 output: html_document
 ---
 
+
 ## Установка библиотек:
 ```{r, message = FALSE, warning=FALSE}
-# install.packages(c("readxl", "tidyverse", "dplyr", "ggplot2", "ggpubr", "car", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
+# install.packages(
+# c("readxl", "tidyverse", "dplyr", "ggplot2", "ggpubr", "car", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
 # install.packages("tableone", repos = "https://cloud.r-project.org/")
 # install.packages("MatchIt", repos = "https://cloud.r-project.org/")
 # install.packages("glmnet", repos = "https://cloud.r-project.org/")

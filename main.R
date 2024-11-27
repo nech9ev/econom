@@ -1,14 +1,11 @@
-# install.packages(c("readxl", "tidyverse", "dplyr", "ggplot2", "ggpubr", "car", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
+# install.packages(c("readxl", "tidyverse", "dplyr", "ggplot2", "multcomp", "readxl", "broom", "gridExtra", "rstatix", "readxl", "knitr"))
 # install.packages("tableone", repos = "https://cloud.r-project.org/")
 # install.packages("MatchIt", repos = "https://cloud.r-project.org/")
 # install.packages("glmnet", repos = "https://cloud.r-project.org/")
-# install.packages("twang", repos = "https://cloud.r-project.org/")
-# install.packages("AER", repos = "https://cloud.r-project.org/")
 # install.packages("rddensity", repos = "https://cloud.r-project.org/")
 # install.packages("sandwich", repos = "https://cloud.r-project.org/")
 # install.packages("cobalt", repos = "https://cloud.r-project.org/")
 # install.packages("WeightIt", repos = "https://cloud.r-project.org/")
-# install.packages("randomForest", repos = "https://cloud.r-project.org/")
 # install.packages("grf", repos = "https://cloud.r-project.org/")
 # install.packages("caTools", repos = "https://cloud.r-project.org/")
 
@@ -16,7 +13,6 @@ library(tidyverse)
 library(dplyr)
 library(tableone)
 library(ggplot2)
-library(ggpubr)
 library(multcomp)
 library(readxl)
 library(broom)
@@ -26,14 +22,11 @@ library(readxl)
 library(knitr)
 library("MatchIt")
 library(glmnet)
-library(twang)
-library(AER)
 library(tidyverse)
 library(rddensity)
 library('WeightIt')
 library('tableone')
 library(boot)
-library(randomForest)
 library(grf)
 library(hdm)
 library(caTools)
@@ -45,11 +38,6 @@ set.seed(239)
 task_data <- task_data %>%
   mutate(
     HGT_parent = coalesce(HGT_mother, HGT_father)
-    # ifelse(
-    #   test = is.na(HGT_mother) | is.na(HGT_father),
-    #   yes = coalesce(HGT_mother, HGT_father),
-    #   no = (HGT_mother + HGT_father) / 2.0
-    # )
   )
 
 # Добавление moved
@@ -66,59 +54,53 @@ task_data <- task_data %>%
   ungroup()
 
 # Расчет средних значений для каждой группы
-# means <- task_data %>%
-#   group_by(moved) %>%
-#   summarize(
-#     mean_fam_size = mean(fam_size, na.rm = TRUE),
-#     mean_class_of_work = mean(class_of_work, na.rm = TRUE),
-#     mean_education = mean(education, na.rm = TRUE),
-#     mean_HGT_parent = mean(HGT_parent, na.rm = TRUE),
-#     mean_self_conf = mean(self_conf, na.rm = TRUE),
-#     mean_size_of_firm = mean(size_of_firm, na.rm = TRUE),
-#     mean_risk = mean(risk, na.rm = TRUE),
-#   )
-# kable(means, caption = "Средние значения для каждой группы")
+means <- task_data %>%
+  group_by(moved) %>%
+  summarize(
+    mean_fam_size = mean(fam_size, na.rm = TRUE),
+    mean_class_of_work = mean(class_of_work, na.rm = TRUE),
+    mean_education = mean(education, na.rm = TRUE),
+    mean_HGT_parent = mean(HGT_parent, na.rm = TRUE),
+    mean_self_conf = mean(self_conf, na.rm = TRUE),
+    mean_size_of_firm = mean(size_of_firm, na.rm = TRUE),
+    mean_risk = mean(risk, na.rm = TRUE),
+  )
+kable(means, caption = "Средние значения для каждой группы")
 
 variables <- c("fam_size", "class_of_work", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
-# pairwise_test_results <- task_data %>%
-#   gather(variable, value, all_of(variables)) %>%
-#   group_by(variable) %>%
-#   pairwise_wilcox_test(value ~ moved, p.adjust.method = "bonferroni")
-#
-# create_table <- function(df, var) {
-#   df %>%
-#     filter(variable == var) %>%
-#     select(group1, group2, p.adj)
-# }
-#
-#
-# for (var in variables) {
-#   table_for_var <- as.data.frame(create_table(pairwise_test_results, var))
-#   cat("\n\n")
-#   print(sprintf("p-value значения между группами moved для %s", var))
-#   print(table_for_var)
-# }
+pairwise_test_results <- task_data %>%
+  gather(variable, value, all_of(variables)) %>%
+  group_by(variable) %>%
+  pairwise_wilcox_test(value ~ moved, p.adjust.method = "bonferroni")
 
+create_table <- function(df, var) {
+  df %>%
+    filter(variable == var) %>%
+    select(group1, group2, p.adj)
+}
+
+
+for (var in variables) {
+  table_for_var <- create_table(pairwise_test_results, var)
+  cat("\n")
+  print(sprintf("p-value значения между группами moved для %s", var))
+  print(table_for_var)
+}
 
 # # end of 1 task
 
 #Добавление treatment
 #переехал и сейчас живет в городе
 all_convariants <- c("children", "fam_size", "married", "region", "years", "class_of_work", "education", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
-lm_data <- task_data %>%
+task_data <- task_data %>%
   mutate(
     treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
   )
-lm_data <- lm_data %>%
+task_data <- task_data %>%
   filter((moved == 2 | moved == 3) & years > 21) %>%
   select(-n, -moved, -hours, -av_central_SMSA, -SMSA_central, -not_central_SMSA, -SMSA_not, -urban, -wage, -HGT_father, -HGT_mother, -sample_id_79, -union, -black)
-lm_data <- na.omit(lm_data)
-
-length(boxplot(lm_data$HGT_parent, main = "HGT_parent before")$out)
-length(boxplot(lm_data$education, main = "education before")$out)
-
-head(nrow(lm_data))
-lm_data <- lm_data %>%
+task_data <- na.omit(task_data)
+task_data <- task_data %>%
   filter(
     !(HGT_parent %in% boxplot(HGT_parent)$out)
       &
@@ -130,16 +112,11 @@ lm_data <- lm_data %>%
       &
       !(years %in% boxplot(years)$out)
   )
-print("AFTER")
-head(nrow(lm_data))
-boxplot(lm_data$HGT_parent, main = "HGT_parent after")
-boxplot(lm_data$education, main = "education after")
 
-
-model <- lm(cpi_w ~ treatment, data = lm_data)
+model <- lm(cpi_w ~ treatment, data = task_data)
 model_summary <- summary(model)
 model_summary
-table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = lm_data, test = TRUE)
+table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = task_data, test = TRUE)
 table1
 
 # Осмысленный вывод почему смещена
@@ -162,7 +139,7 @@ m.out <- matchit(
     white +
     woman +
     AFQT2,
-  data = lm_data,
+  data = task_data,
   nearest = "optimal",
   distance = "mahalanobis",
   estimand = 'ATT'
@@ -188,28 +165,28 @@ boot_results <- boot(data = matched_data, statistic = effect_fun, R = 1000)
 boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный метод построения доверительного интервала
 # end of 3 task
 
-# table1 <- CreateTableOne(vars= all_convariants, strata = "treatment", data=matched_data, test=TRUE)
-# table1
+table1 <- CreateTableOne(vars= all_convariants, strata = "treatment", data=matched_data, test=TRUE)
+table1
 # Вывод что при матчинге лучше соблюдается баланс ковариатов и оценка ATE лучше
 # Баланс ковариатов улучшился при матчинге
 
 # end of 4 task
 
 # Модель пропенси-скора
-# propscore <- weightit(
-#   formula = treatment ~ children + fam_size + married + region,
-#   data = lm_data,
-#   estimand = 'ATT',
-#   method = 'ps',
-# )
-# head(lm_data, 100000)
-# summary(propscore)
-# head(propscore$weights, 10)
-# result <- lm(cpi_w ~ treatment, data = lm_data, weights = propscore$weights)
-# summary(result)
+propscore <- weightit(
+  formula = treatment ~ children + fam_size + married + region,
+  data = task_data,
+  estimand = 'ATT',
+  method = 'ps',
+)
+head(task_data, 100000)
+summary(propscore)
+head(propscore$weights, 10)
+result <- lm(cpi_w ~ treatment, data = task_data, weights = propscore$weights)
+summary(result)
 
 #end of 5 task
-X <- model.matrix(data = lm_data, cpi_w ~
+X <- model.matrix(data = task_data, cpi_w ~
   treatment +
     region +
     education +
@@ -221,7 +198,7 @@ X <- model.matrix(data = lm_data, cpi_w ~
     woman +
     AFQT2)
 head(X, 3)
-DR <- rlassoEffects(X, lm_data$cpi_w, 2, data = lm_data)
+DR <- rlassoEffects(X, task_data$cpi_w, 2, data = task_data)
 # тритмент стоит на 2м месте в матрице X
 print_coef(DR) # ATE
 # confint(DR)
@@ -230,9 +207,9 @@ summary(DR)
 
 # DR$selection.matrix #кого выкинули или оставили
 # DR$coef.mat #вывести все коэффициенты
-# Y <- lm_data$cpi_w
+# Y <- task_data$cpi_w
 # head(Y, 5)
-# X <- model.matrix(data = lm_data, cpi_w ~ 0 +
+# X <- model.matrix(data = task_data, cpi_w ~ 0 +
 #   treatment +
 #   region +
 #   education +
@@ -249,10 +226,10 @@ summary(DR)
 
 #end of 6 task
 
-split <- sample.split(rownames(lm_data), SplitRatio = .8)
+split <- sample.split(rownames(task_data), SplitRatio = .8)
 
-data_train_sample <- lm_data %>% subset(split == TRUE)
-data_test_sample <- lm_data %>% subset(split == FALSE)
+data_train_sample <- task_data %>% subset(split == TRUE)
+data_test_sample <- task_data %>% subset(split == FALSE)
 print("Sizez")
 print(nrow(data_test_sample))
 print(nrow(data_train_sample))

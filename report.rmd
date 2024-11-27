@@ -46,11 +46,12 @@ library(caTools)
 
 task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
 set.seed(239)
+nrow(task_data)
 head(task_data, 1)
 
 ```
 
-## Задание 1
+# Задание 1
 ### Разделение на 4 группы
 Добавлю колонку moved, которая будет содержать числа от 1 до 4.
 Каждое число кодируют факт о респонденте
@@ -72,13 +73,17 @@ task_data <- task_data %>%
     )
   ) %>%
   ungroup()
-
+nrow(task_data %>% filter(moved == 1)) #количество moved == 1
+nrow(task_data %>% filter(moved == 2)) #количество moved == 2
+nrow(task_data %>% filter(moved == 3)) #количество moved == 3
+nrow(task_data %>% filter(moved == 4)) #количество moved == 4
 head(task_data, 1)
 ```
 
 Добавлю недостающий параметр: образование родителей
 
 если нет данных об образовании матери либо отца, беру значение образования родителя данные о котором есть
+также очищаю `HGT_parent` от выбросов
 ```{r}
 task_data <- task_data %>%
   mutate(
@@ -120,6 +125,10 @@ means <- task_data %>%
 kable(means, caption = "Средние значения для каждой группы")
 ```
 
+## Выводы по средним значениям
+Сразу выделяется показатели группы номер 3: людей, которые переехали в город
+все средние значения которых выше чем у любой другой группы
+
 
 ## Расчет средних значений для каждой группы
 ```{r}
@@ -150,6 +159,9 @@ for (var in variables) {
 ### Выделю `treatment` группу и удалю не нужные группы `moved`
 `(moved == 3 & SMSA_central == 1)` - человек переехал в крупный город
 `moved == 2` - человек всегда жил в маленьком городе
+
+Заметим, что в США возраст совершеннолетия 21, поэтому нам нет смысла рассматривать изменения в доходе людей,
+которые не могут работать
 ```{r}
 task_data <- task_data %>%
   mutate(
@@ -159,9 +171,9 @@ task_data <- task_data %>%
 task_data <- task_data %>%
   filter((moved == 2 | moved == 3) & years > 21)
 task_data <- task_data %>%
-  filter(
-    !(HGT_parent %in% boxplot(HGT_parent)$out)
-      &
+  filter( #очистка данных от выбросов
+    # !(HGT_parent %in% boxplot(HGT_parent)$out)
+    #   &
       !(education %in% boxplot(education)$out)
       &
       !(size_of_firm %in% boxplot(size_of_firm)$out)
@@ -328,10 +340,8 @@ B <- 100000 # количество деревьев - такой-же резул
 tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
 tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
 
-# Построим 95%-й доверительный интервал для оценок
 # tau.hat$predictions - вектор оценок HTE
 # tau.hat$variance.estimates - вектор дисперсий оценок HTE
-
 sigma.hat <- sqrt(tau.hat$variance.estimates)
 CI <- list(
   L = tau.hat$predictions - qnorm(0.95) * sigma.hat,

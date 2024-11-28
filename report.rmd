@@ -242,7 +242,7 @@ m.out <- matchit(
     married +
     region +
     years +
-          t +
+    t +
     AFQT2 +
     education +
     hispanic +
@@ -297,7 +297,7 @@ propscore <- weightit(
     married +
     region +
     years +
-          t +
+    t +
     class_of_work +
     education +
     hispanic +
@@ -328,7 +328,7 @@ X <- model.matrix(data = task_data, cpi_w ~
     married +
     region +
     years +
-          t +
+    t +
     class_of_work +
     education +
     hispanic +
@@ -449,14 +449,15 @@ plot_data <- data.frame(
 ggplot(
   data = plot_data,
   mapping = aes(x = size_of_firm, y = predicted_effect)
-) + geom_point() +
+) +
+  geom_point() +
   geom_smooth(method = "loess")
 ```
 
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = education, x = education,y = predicted_effect)
+  mapping = aes(group = education, x = education, y = predicted_effect)
 ) +
   geom_boxplot(outlier.shape = NA)
 ```
@@ -464,14 +465,14 @@ ggplot(
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = woman, x = woman,y = predicted_effect)
+  mapping = aes(group = woman, x = woman, y = predicted_effect)
 ) +
   geom_boxplot(outlier.shape = NA)
 ```
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = white, x = white,y = predicted_effect)
+  mapping = aes(group = white, x = white, y = predicted_effect)
 ) +
   geom_boxplot(outlier.shape = NA)
 ```
@@ -529,22 +530,24 @@ ggplot(
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = married, x = married,y = predicted_effect)
+  mapping = aes(group = married, x = married, y = predicted_effect)
 ) +
-  geom_boxplot(outlier.shape = NA) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+  geom_boxplot(outlier.shape = NA) +
+  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
 ```
 
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = hispanic, x = hispanic,y = predicted_effect)
+  mapping = aes(group = hispanic, x = hispanic, y = predicted_effect)
 ) +
-  geom_boxplot(outlier.shape = NA) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+  geom_boxplot(outlier.shape = NA) +
+  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
 ```
 ```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(group = region, x = region,y = predicted_effect)
+  mapping = aes(group = region, x = region, y = predicted_effect)
 ) +
   geom_boxplot(outlier.shape = NA)
 ```
@@ -553,15 +556,9 @@ ggplot(
 ggplot(
   data = plot_data,
   mapping = aes(x = HGT_parent, y = predicted_effect)
-) + geom_point() +
+) +
+  geom_point() +
   geom_smooth(method = "loess")
-```
-
-```{r}
-ggplot(
-  data = plot_data,
-  mapping = aes(x = risk, y = predicted_effect)
-) + geom_point()
 ```
 
 

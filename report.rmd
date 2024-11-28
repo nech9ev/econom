@@ -16,7 +16,7 @@ output: rmarkdown::html_vignette
 # install.packages("WeightIt", repos = "https://cloud.r-project.org/")
 # install.packages("grf", repos = "https://cloud.r-project.org/")
 # install.packages("caTools", repos = "https://cloud.r-project.org/")
-# install.packages("stargazer", repos = "https://cloud.r-project.org/")
+# install.packages("optmatch", repos = "https://cloud.r-project.org/")
 
 library(tidyverse)
 library(dplyr)
@@ -39,6 +39,8 @@ library(boot)
 library(grf)
 library(hdm)
 library(caTools)
+library(optmatch)
+
 ```
 
 ### Загрузка данных
@@ -83,7 +85,7 @@ head(task_data, 1)
 Добавлю недостающий параметр: образование родителей
 
 если нет данных об образовании матери либо отца, беру значение образования родителя данные о котором есть
-также очищаю `HGT_parent` от выбросов
+также очищаю `HGT_parent` от выбросов с помощью идеи из [статьи](https://medium.com/@proshuta/r-%D0%BE%D0%BF%D1%80%D0%B5%D0%B4%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D0%BE%D0%B2-%D0%B2-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-%D0%BD%D0%B0-%D0%BB%D0%B5%D1%82%D1%83-b48aea603391)
 ```{r}
 task_data <- task_data %>%
   mutate(
@@ -110,6 +112,12 @@ head(task_data, 1)
 6. Размер фирмы
 7. Отношение к риску
 
+Но прежде чем оценивать средние значения, необходимо понять за какие года представлена выборка.
+С пониманием исторического периода США, внутри которого находились респонденты, мы сможем предположить почему
+некоторые параметры важнее других.
+```{r}
+boxplot(task_data$t)
+```
 ```{r}
 means <- task_data %>%
   group_by(moved) %>%
@@ -126,11 +134,15 @@ kable(means, caption = "Средние значения для каждой гр
 ```
 
 ## Выводы по средним значениям
-Сразу выделяется показатели группы номер 3: людей, которые переехали в город
-все средние значения которых выше чем у любой другой группы
+Сразу выделяется показатели группы номер 3: у людей, которые переехали в город,
+все средние значения выше чем у любой другой группы респондентов
+Особенно выделяется показатель m_size_of_firm, он почти в 2 раза выше чем у других групп;
+Также выделяется уровень способностей и риска, что и следовало ожидать.
 
+Предположу что из-за экономического бума 90 годов, в частности из-за технологической революции
+которая создала спрос на квалифицированных специалистов. Крупные компании чаще стали искать сотрудников высокой мотивацией и гибкостью, что сделало их привлекательными для переехавших.
 
-## Расчет средних значений для каждой группы
+## Попарные сравнения средних между каждой парой групп
 ```{r}
 variables <- c("fam_size", "AFQT2", "education", "HGT_parent", "self_conf", "size_of_firm", "risk")
 pairwise_test_results <- task_data %>%
@@ -152,6 +164,14 @@ for (var in variables) {
   print(data)
 }
 ```
+### Из полученных результатов можно выделить:
+1. Размер семьи у людей переехавших из города и у людей которые всегда жили вне города не имеет существенной разницы (p-value = 1)
+2. Уровень способностей у людей из всех групп значимо различается (p-value << 0.5)
+3. Собственное образование и образование родителей у людей которые всегда жили в городе значимо различается только с переехавшими в город
+4. Уровень уверенности у людей из всех групп значимо различается только в сравнении с группой которая всегда живет вне города
+5. Размер фирмы не различается значимо только у людей которые жили всегда в городе и переехали из него
+6. Уровень риска люди всегда живущие в городе чувствуют такой же, как и те, которые всегда живут вне города
+
 
 
 # Задание 2
@@ -160,21 +180,15 @@ for (var in variables) {
 `(moved == 3 & SMSA_central == 1)` - человек переехал в крупный город
 `moved == 2` - человек всегда жил в маленьком городе
 
-Заметим, что в США возраст совершеннолетия 21, поэтому нам нет смысла рассматривать изменения в доходе людей,
-которые не могут работать
+Замечу, что в США возраст совершеннолетия 21, поэтому нам нет смысла рассматривать изменения в доходе людей,
+которые не могут зарабатывать.
 ```{r}
-task_data <- task_data %>%
-  mutate(
-    treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
-  )
 
 task_data <- task_data %>%
   filter((moved == 2 | moved == 3) & years > 21)
 task_data <- task_data %>%
   filter( #очистка данных от выбросов
-    # !(HGT_parent %in% boxplot(HGT_parent)$out)
-    #   &
-      !(education %in% boxplot(education)$out)
+    !(education %in% boxplot(education)$out)
       &
       !(size_of_firm %in% boxplot(size_of_firm)$out)
       &
@@ -183,6 +197,12 @@ task_data <- task_data %>%
       !(years %in% boxplot(years)$out)
   )
 
+task_data <- task_data %>%
+  mutate(
+    treatment = ifelse((moved == 3 & SMSA_central == 1), 1, 0)
+  )
+
+nrow(task_data %>% filter(treatment == 1))
 head(task_data, 1)
 ```
 
@@ -196,36 +216,38 @@ nrow(task_data)
 ```{r}
 task_data <- task_data %>%
   select(
-          -n, -moved, -hours, -av_central_SMSA, -SMSA_central,
-          -not_central_SMSA, -SMSA_not, -urban, -wage,
-          -HGT_father, -HGT_mother, -sample_id_79, -union, -black
+    -n, -moved, -hours, -av_central_SMSA, -SMSA_central,
+    -not_central_SMSA, -SMSA_not, -urban, -wage,
+    -HGT_father, -HGT_mother, -sample_id_79, -union, -black,
+    -shiblings, -town_14, -south_birth
   )
 head(task_data, 1)
 ```
 
 ### Оценка эффекта переезда на зарплату с помощью парной регрессии
 ```{r}
-all_convariants <- c("children", "fam_size", "AFQT2", "married", "region", "years", "class_of_work", "education", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
+all_convariants <- c("children", "fam_size", "AFQT2", "married", "region", "years", "t", "class_of_work", "education", "hispanic", "promotion", "HGT_parent", "risk", "size_of_firm", "self_conf", "white", "woman")
 model <- lm(cpi_w ~ treatment, data = task_data)
 summary(model)
 CreateTableOne(vars = all_convariants, strata = "treatment", data = task_data, test = TRUE)
 ```
-
-Осмысленный вывод почему смещена
-Из таблицы видно что баланс ковариатов не соблюдается, следовательно оценка смещена так как между группами есть статистически значимое различие
+Для 7 из 14 ковариатов гипотеза о равенстве средних в двух выборках отвергается (p-value < 0.05), значит баланс ковариатов не соблюдается, поэтому оценка смещена. Между группами есть статистически значимое различие.
 
 # Задание 3
 ### Оценка эффекта переезда на зарплату мэтчингом
-```{r}
+```{r fig.align='center'}
 m.out <- matchit(
   formula = treatment ~ children +
     fam_size +
-    AFQT2 +
     married +
     region +
     years +
-    class_of_work +
+          t +
+    AFQT2 +
     education +
+    hispanic +
+    promotion +
+    class_of_work +
     HGT_parent +
     risk +
     size_of_firm +
@@ -233,10 +255,13 @@ m.out <- matchit(
     white +
     woman,
   data = task_data,
-  nearest = "optimal",
-  distance = "mahalanobis",
+  method = 'nearest',
+  distance = 'mahalanobis',
   estimand = 'ATT'
 )
+head(m.out$weights, 30)
+summary(m.out)
+plot(summary(m.out))
 matched_data <- match.data(m.out)
 model <- lm(cpi_w ~ treatment, data = matched_data)
 summary(model)
@@ -257,11 +282,10 @@ boot.ci(boot_results, conf = 0.95, type = "perc") #перцентильный м
 # Задание 4
 ### Таблица с балансом ковариатов после процедуры мэтчинга
 ```{r}
-table1 <- CreateTableOne(vars = all_convariants, strata = "treatment", data = matched_data, test = TRUE)
-table1
+CreateTableOne(vars = all_convariants, strata = "treatment", data = matched_data, test = TRUE)
 ```
-Вывод что при матчинге лучше соблюдается баланс ковариатов и оценка лучше
-Баланс ковариатов улучшился при матчинге
+При матчинге лучше соблюдается баланс ковариатов (5 из 14 различаются).
+До и после матчинга `treatment` положительно влияет на `cpi_w`
 
 # Задание 5
 ### Оценка эффекта переезда на заработную плату методом inverse probability weighting на основе propensity score
@@ -273,8 +297,11 @@ propscore <- weightit(
     married +
     region +
     years +
+          t +
     class_of_work +
     education +
+    hispanic +
+    promotion +
     HGT_parent +
     risk +
     size_of_firm +
@@ -295,21 +322,43 @@ summary(result)
 ```{r}
 X <- model.matrix(data = task_data, cpi_w ~
   treatment +
+    children +
+    fam_size +
+    AFQT2 +
+    married +
     region +
+    years +
+          t +
+    class_of_work +
     education +
+    hispanic +
+    promotion +
     HGT_parent +
     risk +
     size_of_firm +
     self_conf +
     white +
-    woman +
-    AFQT2
+    woman
 )
 head(X, 1)
 DR <- rlassoEffects(X, task_data$cpi_w, 2, data = task_data)
-print_coef(DR)
+print_coef(DR) #ATE
+confint(DR)
+summary(DR)
 ```
+DR LASSO также указывает на положительное влияние `treatment` на `cpi_w`
 
+```{r}
+DR$selection.matrix #выкинули или оставили
+```
+Выкинули `children`, `fam_size`, `married`, `region`, `years`, `class_of_work`, `education`, `HGT_parent`, `risk`, `size_of_firm`
+
+
+Все коэффициенты
+
+```{r}
+DR$coef.mat
+```
 # Задание 8
 ### Оценка эффекта от переезда на заработную плату методом причинного случайного леса
 ```{r}
@@ -335,8 +384,8 @@ data_test <- list(
 )
 head(data_train$X, 3)
 
-B <- 100000 # количество деревьев - такой-же результат
-# B <- 10000
+# B <- 100000 # количество деревьев - такой-же результат
+B <- 1000
 tau.forest <- causal_forest(data_train$X, data_train$Y, data_train$W, num.trees = B)
 tau.hat <- predict(tau.forest, data_test$X, estimate.variance = TRUE)
 
@@ -361,64 +410,158 @@ var_imp_df <- data.frame(
   importance = var_imp,
   variable = colnames(data_test$X)
 ) %>% arrange(desc(importance))
+
+```
+## Какие характеристики людей вносят наибольший вклад в разброс эффектов
+```{r}
 var_imp_df
 
 ggplot(var_imp_df, aes(x = reorder(variable, importance), y = importance)) +
   geom_bar(stat = "identity") +
   coord_flip() +
-  labs(x = "Переменная", y = "Важность")
+  labs(x = "Ковариат", y = "Важность")
 
 hist(tau.hat$predictions, main = "Гистограмма распределения эффектов от фактора переезда")
 
 plot_data <- data.frame(
   predicted_effect = tau.hat$predictions,
   years = data_test$X$years,
+  white = data_test$X$white,
+  woman = data_test$X$woman,
   self_conf = data_test$X$self_conf,
   t = data_test$X$t,
   size_of_firm = data_test$X$size_of_firm,
   education = data_test$X$education,
   AFQT2 = data_test$X$AFQT2,
-  self_conf = data_test$X$self_conf
+  children = data_test$X$children,
+  fam_size = data_test$X$fam_size,
+  married = data_test$X$married,
+  class_of_work = data_test$X$class_of_work,
+  hispanic = data_test$X$hispanic,
+  promotion = data_test$X$promotion,
+  region = data_test$X$region,
+  HGT_parent = data_test$X$HGT_parent,
+  risk = data_test$X$risk
 )
+```
 
+```{r}
 ggplot(
   data = plot_data,
   mapping = aes(x = size_of_firm, y = predicted_effect)
-) + geom_point()
+) + geom_point() +
+  geom_smooth(method = "loess")
+```
 
+```{r}
 ggplot(
   data = plot_data,
-  mapping = aes(x = education, y = predicted_effect)
-) + geom_point()
+  mapping = aes(group = education, x = education,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA)
+```
 
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(group = woman, x = woman,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA)
+```
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(group = white, x = white,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA)
+```
+```{r}
 ggplot(
   data = plot_data,
   mapping = aes(x = years, y = predicted_effect)
 ) +
   geom_point() +
   geom_smooth(method = "loess")
+```
+```{r warning=FALSE}
+ggplot(
+  data = plot_data,
+  mapping = aes(x = children, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+```
+```{r warning=FALSE}
+ggplot(
+  data = plot_data,
+  mapping = aes(x = fam_size, y = predicted_effect)
+) +
+  geom_point() +
+  geom_smooth(method = "loess")
+```
 
+```{r}
 ggplot(
   data = plot_data,
   mapping = aes(x = t, y = predicted_effect)
 ) +
   geom_point() +
   geom_smooth(method = "loess")
+```
 
+```{r}
 ggplot(
   data = plot_data,
   mapping = aes(x = AFQT2, y = predicted_effect)
 ) +
   geom_point() +
   geom_smooth(method = "loess")
+```
 
+```{r}
 ggplot(
   data = plot_data,
   mapping = aes(x = self_conf, y = predicted_effect)
 ) +
   geom_point() +
   geom_smooth(method = "loess")
-plot(tau.hat$predictions ~ data_test$df$region, type = "S")
+```
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(group = married, x = married,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+```
+
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(group = hispanic, x = hispanic,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA) + geom_dotplot(binaxis='y', stackdir='center', dotsize=1)
+```
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(group = region, x = region,y = predicted_effect)
+) +
+  geom_boxplot(outlier.shape = NA)
+```
+
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(x = HGT_parent, y = predicted_effect)
+) + geom_point() +
+  geom_smooth(method = "loess")
+```
+
+```{r}
+ggplot(
+  data = plot_data,
+  mapping = aes(x = risk, y = predicted_effect)
+) + geom_point()
 ```
 
 

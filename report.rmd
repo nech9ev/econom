@@ -82,10 +82,10 @@ nrow(task_data %>% filter(moved == 4)) #количество moved == 4
 head(task_data, 1)
 ```
 
-Добавлю недостающий параметр: образование родителей
+Добавляем недостающий параметр: образование родителей
 
-если нет данных об образовании матери либо отца, беру значение образования родителя данные о котором есть
-также очищаю `HGT_parent` от выбросов с помощью идеи из [статьи](https://medium.com/@proshuta/r-%D0%BE%D0%BF%D1%80%D0%B5%D0%B4%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D0%BE%D0%B2-%D0%B2-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-%D0%BD%D0%B0-%D0%BB%D0%B5%D1%82%D1%83-b48aea603391)
+если нет данных об образовании матери либо отца, берем значение образования родителя данные о котором есть
+также очистим `HGT_parent` от выбросов с помощью идеи из [статьи](https://medium.com/@proshuta/r-%D0%BE%D0%BF%D1%80%D0%B5%D0%B4%D0%B5%D0%BB%D0%B5%D0%BD%D0%B8%D0%B5-%D0%B2%D1%8B%D0%B1%D1%80%D0%BE%D1%81%D0%BE%D0%B2-%D0%B2-%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85-%D0%BD%D0%B0-%D0%BB%D0%B5%D1%82%D1%83-b48aea603391)
 ```{r}
 task_data <- task_data %>%
   mutate(
@@ -139,7 +139,7 @@ kable(means, caption = "Средние значения для каждой гр
 Особенно выделяется показатель m_size_of_firm, он почти в 2 раза выше чем у других групп;
 Также выделяется уровень способностей и риска, что и следовало ожидать.
 
-Предположу что из-за экономического бума 90 годов, в частности из-за технологической революции
+Предположим что из-за экономического бума 90 годов, в частности из-за технологической революции
 которая создала спрос на квалифицированных специалистов. Крупные компании чаще стали искать сотрудников высокой мотивацией и гибкостью, что сделало их привлекательными для переехавших.
 
 ## Попарные сравнения средних между каждой парой групп
@@ -180,7 +180,7 @@ for (var in variables) {
 `(moved == 3 & SMSA_central == 1)` - человек переехал в крупный город
 `moved == 2` - человек всегда жил в маленьком городе
 
-Замечу, что в США возраст совершеннолетия 21, поэтому нам нет смысла рассматривать изменения в доходе людей,
+Заметим, что в США возраст совершеннолетия 21, поэтому нам нет смысла рассматривать изменения в доходе людей,
 которые не могут зарабатывать.
 ```{r}
 
@@ -211,8 +211,8 @@ head(task_data, 1)
 task_data <- na.omit(task_data)
 nrow(task_data)
 ```
-Избавлюсь от лишних колонок, которые не будут использоваться в заданиях,
-дублируют другие колонки, или не несет смысловой нагрузки в рамках датасета
+Избавимся от лишних колонок, которые не будут использоваться в заданиях,
+дублируют другие колонки, или не несут смысловой нагрузки в рамках датасета
 ```{r}
 task_data <- task_data %>%
   select(
@@ -445,38 +445,57 @@ plot_data <- data.frame(
 )
 ```
 
-```{r}
+
+
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
-  mapping = aes(x = size_of_firm, y = predicted_effect)
+  mapping = aes(x = size_of_firm, y = predicted_effect),
 ) +
   geom_point() +
-  geom_smooth(method = "loess")
-```
+  geom_smooth(method = "loess") +
+  labs(
+    title = "Эффект от размера фирмы",
+    caption = ""
+  )
 
-```{r}
+```
+Если работать в маленькой компании, то эффект от переезда в город будет меньше чем если бы человек работал в большой компании. Это можно объяснить более конкурентной зарплатой в больших компаниях на фоне технологического бума.
+
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = education, x = education, y = predicted_effect)
-) +
-  geom_boxplot(outlier.shape = NA)
+) + geom_boxplot(outlier.shape = NA) +
+  labs(
+    title = "Эффект от образования",
+    caption = ""
+  )
 ```
+Люди, которые пошли работать сразу после школы, зарабатывают больше чем люди которые пошли получать высшее образование, так как последние не готовы уделять работе столько же времени
 
-```{r}
+
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = woman, x = woman, y = predicted_effect)
 ) +
-  geom_boxplot(outlier.shape = NA)
+  geom_boxplot(outlier.shape = NA) +
+  labs(
+    title = "Эффект от пола",
+    caption = ""
+  )
 ```
-```{r}
+Ожидаемый эффект женщин и мужчин практически одинаков, видно небольшое преимущество мужчин
+
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = white, x = white, y = predicted_effect)
 ) +
   geom_boxplot(outlier.shape = NA)
 ```
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(x = years, y = predicted_effect)
@@ -484,7 +503,7 @@ ggplot(
   geom_point() +
   geom_smooth(method = "loess")
 ```
-```{r warning=FALSE}
+```{r fig.align = 'center', warning=FALSE}
 ggplot(
   data = plot_data,
   mapping = aes(x = children, y = predicted_effect)
@@ -492,7 +511,7 @@ ggplot(
   geom_point() +
   geom_smooth(method = "loess")
 ```
-```{r warning=FALSE}
+```{r fig.align = 'center', warning=FALSE}
 ggplot(
   data = plot_data,
   mapping = aes(x = fam_size, y = predicted_effect)
@@ -501,7 +520,7 @@ ggplot(
   geom_smooth(method = "loess")
 ```
 
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(x = t, y = predicted_effect)
@@ -510,7 +529,7 @@ ggplot(
   geom_smooth(method = "loess")
 ```
 
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(x = AFQT2, y = predicted_effect)
@@ -519,7 +538,7 @@ ggplot(
   geom_smooth(method = "loess")
 ```
 
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(x = self_conf, y = predicted_effect)
@@ -527,7 +546,7 @@ ggplot(
   geom_point() +
   geom_smooth(method = "loess")
 ```
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = married, x = married, y = predicted_effect)
@@ -536,7 +555,7 @@ ggplot(
   geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
 ```
 
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = hispanic, x = hispanic, y = predicted_effect)
@@ -544,7 +563,7 @@ ggplot(
   geom_boxplot(outlier.shape = NA) +
   geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
 ```
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(group = region, x = region, y = predicted_effect)
@@ -552,7 +571,7 @@ ggplot(
   geom_boxplot(outlier.shape = NA)
 ```
 
-```{r}
+```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
   mapping = aes(x = HGT_parent, y = predicted_effect)

@@ -466,7 +466,8 @@ ggplot(
 ggplot(
   data = plot_data,
   mapping = aes(group = education, x = education, y = predicted_effect)
-) + geom_boxplot(outlier.shape = NA) +
+) +
+  geom_boxplot(outlier.shape = NA) +
   labs(
     title = "Эффект от образования",
     caption = ""
@@ -493,32 +494,13 @@ ggplot(
   data = plot_data,
   mapping = aes(group = white, x = white, y = predicted_effect)
 ) +
-  geom_boxplot(outlier.shape = NA)
+  geom_boxplot(outlier.shape = NA) +
+  labs(
+    title = "Эффект от цвета кожи",
+    caption = ""
+  )
 ```
-```{r fig.align = 'center'}
-ggplot(
-  data = plot_data,
-  mapping = aes(x = years, y = predicted_effect)
-) +
-  geom_point() +
-  geom_smooth(method = "loess")
-```
-```{r fig.align = 'center', warning=FALSE}
-ggplot(
-  data = plot_data,
-  mapping = aes(x = children, y = predicted_effect)
-) +
-  geom_point() +
-  geom_smooth(method = "loess")
-```
-```{r fig.align = 'center', warning=FALSE}
-ggplot(
-  data = plot_data,
-  mapping = aes(x = fam_size, y = predicted_effect)
-) +
-  geom_point() +
-  geom_smooth(method = "loess")
-```
+Черные мужчины могли рассчитывать на большее увеличение зарплаты, предположительно это связано с тем, что вне больших городов у темнокожего населения небольшой спектр возможностей
 
 ```{r fig.align = 'center'}
 ggplot(
@@ -526,17 +508,27 @@ ggplot(
   mapping = aes(x = t, y = predicted_effect)
 ) +
   geom_point() +
-  geom_smooth(method = "loess")
+  geom_smooth(method = "loess") +
+  labs(
+    title = "Эффект от года",
+    caption = ""
+  )
 ```
+С началом технологического бума эффект от переезда в большой город стал увеличиваться
 
 ```{r fig.align = 'center'}
 ggplot(
   data = plot_data,
-  mapping = aes(x = AFQT2, y = predicted_effect)
+  mapping = aes(x = years, y = predicted_effect)
 ) +
   geom_point() +
-  geom_smooth(method = "loess")
+  geom_smooth(method = "loess") +
+  labs(
+    title = "Эффект от возраста",
+    caption = ""
+  )
 ```
+Возраст после 27 обычно связан с началом успехов в карьерном плане
 
 ```{r fig.align = 'center'}
 ggplot(
@@ -544,40 +536,15 @@ ggplot(
   mapping = aes(x = self_conf, y = predicted_effect)
 ) +
   geom_point() +
-  geom_smooth(method = "loess")
+  geom_smooth(method = "loess") +
+  labs(
+    title = "Эффект от уверенности",
+    caption = ""
+  )
 ```
-```{r fig.align = 'center'}
-ggplot(
-  data = plot_data,
-  mapping = aes(group = married, x = married, y = predicted_effect)
-) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
-```
-
-```{r fig.align = 'center'}
-ggplot(
-  data = plot_data,
-  mapping = aes(group = hispanic, x = hispanic, y = predicted_effect)
-) +
-  geom_boxplot(outlier.shape = NA) +
-  geom_dotplot(binaxis = 'y', stackdir = 'center', dotsize = 1)
-```
-```{r fig.align = 'center'}
-ggplot(
-  data = plot_data,
-  mapping = aes(group = region, x = region, y = predicted_effect)
-) +
-  geom_boxplot(outlier.shape = NA)
-```
-
-```{r fig.align = 'center'}
-ggplot(
-  data = plot_data,
-  mapping = aes(x = HGT_parent, y = predicted_effect)
-) +
-  geom_point() +
-  geom_smooth(method = "loess")
-```
+Чем лучше человек себя оценивает, тем выше его ожидаемый эффект. При этом на графике можно видеть понижение реального эффекта, если самооценка человека средняя. Это свидетельствует о его неопределенности в себе, что и занижает эффект.
 
 
+
+## Идеальный кандидат на переезд
+Чернокожий мужчина, работает в большой компании, 1970 года рождения из региона 3, переезжает в 1987 году, окончил школу и не планирует поступать в университет. С высокой самооценкой и высоким образованием у родителей, желательно единственный ребенок в семье.

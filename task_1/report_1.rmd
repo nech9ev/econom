@@ -54,7 +54,7 @@ library(optmatch)
 ### Загрузка данных
 ```{r}
 
-task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
+task_data <- read_excel("../data/wage_gap.xlsx", na = c(".", "", " "))
 set.seed(239)
 nrow(task_data)
 head(task_data, 1)

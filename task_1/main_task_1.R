@@ -30,7 +30,7 @@ library(hdm)
 library(caTools)
 
 # Загрузка данных
-task_data <- read_excel("data/wage_gap.xlsx", na = c(".", "", " "))
+task_data <- read_excel("../data/wage_gap.xlsx", na = c(".", "", " "))
 set.seed(239)
 # Добавление HGT_parent
 task_data <- task_data %>%

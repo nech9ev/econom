@@ -1,4 +1,157 @@
 ---
-title: "R Notebook"
-output: html_document
+title: "Домашнее задание 3 по прикладной эконометрике"
+subtitle: "Московский Государственный Университет им. М.В. Ломоносова
+Экономический факультет
+Кафедра Финансов и Кредита"
+author: "Хейфец Владислава (э404) Чиркизьянова Виктория (э404)"
+date: "27 ноября 2024 года"
+output: rmarkdown::html_vignette
 ---
+Москва
+23.12.2024
+
+## Задание 1
+### Объясните коротко, зачем авторы приводят рисунок 2.
+
+Чтобы доказать утверждение о схожей динамике туристических потоков и
+отсутствие конкурентной реакции отелей Сардинии в ответ на принятие закона "Макрона" на территории Франции (Корсика)
+
+
+## Задание 2
+
+### Установка библиотек
+```{r, message = FALSE, warning=FALSE}
+if (!require(haven)) { install.packages("haven") }
+if (!require(dplyr)) { install.packages("dplyr") }
+if (!require(lmtest)) { install.packages("lmtest") }
+if (!require(sandwich)) { install.packages("sandwich") }
+if (!require(stargazer)) { install.packages("stargazer") }
+if (!require(fixest)) { install.packages("fixest") }
+
+library(haven)
+library(dplyr)
+library(lmtest)
+library(sandwich)
+library(fixest)
+library(stargazer)
+
+```
+
+### Загрузка данных
+```{r}
+data <- read_dta("data/data_mac_sr.dta") %>% filter(sample_mac_sr == 1)
+nrow(data)
+head(data, 2)
+set.seed(1)
+```
+
+### Добавление дамми Корсика и Сардиния
+Корсика = region 1
+Сардиния = region 2
+(по информации из лейбла region внутри датасета)
+```{r}
+data$Corsica <- ifelse(data$region == 1, 1, 0)
+data$Sardinia <- ifelse(data$region == 2, 1, 0)
+nrow(data %>% filter(Sardinia == 1))
+```
+
+### Добавление дамми сетевого отеля
+```{r}
+data$Chain <- ifelse(data$dchain == 0, 0, 1)
+data$NoChain <- ifelse(data$dchain == 0, 1, 0)
+nrow(data %>% filter(Chain == 1))
+nrow(data %>% filter(NoChain == 1))
+```
+### Добавление дамми размера отеля
+```{r}
+data$SmallSize <- ifelse(data$capacity < 25, 1, 0)
+data$MediumSize <- ifelse(data$capacity <= 99 & data$capacity >= 25, 1, 0)
+data$LargeSize <- ifelse(data$capacity > 99, 1, 0)
+```
+
+### Добавление дамми звездности
+```{r}
+data$Star1 <- ifelse(data$stars == 1, 1, 0)
+data$Star2 <- ifelse(data$stars == 2, 1, 0)
+data$Star3 <- ifelse(data$stars == 3, 1, 0)
+data$Star4 <- ifelse(data$stars == 4, 1, 0)
+data$Star5 <- ifelse(data$stars == 5, 1, 0)
+```
+
+### Модели
+```{r}
+# "Обычная" разность разностей
+model_1 <- lm(
+  formula = lprice100 ~ Post * Treated,
+  data = data
+)
+
+# Corsica:bdays, Sardinia:bdays, google_src, town_avail
+model_2 <- lm(
+  formula = lprice100 ~ Post * Treated +
+    Corsica * bdays +
+    Sardinia * bdays +
+    google_src +
+    town_avail,
+  data = data
+)
+
+#дамми период после введения закона, дамми тритментгруппы, сетевой/несетевой отель
+model_3 <- lm(
+  formula = lprice100 ~ Post * Treated +
+    Corsica * bdays +
+    Sardinia * bdays +
+    google_src +
+    town_avail +
+    Post * Treated * Chain +
+    Post * Treated * NoChain
+  ,
+  data = data
+)
+
+#дамми период после введения закона, дамми тритментгруппы, звездность отеля
+model_4 <- lm(
+  formula = lprice100 ~ Post * Treated +
+    Corsica * bdays +
+    Sardinia * bdays +
+    google_src +
+    town_avail +
+    Post * Treated * Star1 +
+    Post * Treated * Star2 +
+    Post * Treated * Star3 +
+    Post * Treated * Star4 +
+    Post * Treated * Star5
+  ,
+  data = data
+)
+
+#дамми период после введения закона, дамми тритментгруппы, размер отеля
+model_5 <- lm(
+  formula = lprice100 ~ Post * Treated +
+    Corsica * bdays +
+    Sardinia * bdays +
+    google_src +
+    town_avail +
+    Post * Treated * SmallSize +
+    Post * Treated * MediumSize +
+    Post * Treated * LargeSize
+  ,
+  data = data
+)
+
+stargazer(
+  model_1, model_2, model_3, model_4, model_5,
+  type = "text",
+  keep = c(
+    "Post:Treated",
+    "Post:Treated:NoChain",
+    "Post:Treated:Chain",
+    "Corsica:bdays",
+    "bdays:Sardinia",
+    "google_src",
+    "town_avail"
+  ),
+  omit.stat = c("LL", "ser", "f")
+)
+
+```

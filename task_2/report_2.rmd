@@ -10,23 +10,28 @@ output: rmarkdown::html_vignette
 Москва
 23.12.2024
 
+
+# Оценка эффекта методом «разность разностей»
 ## Задание 1
-### Объясните коротко, зачем авторы приводят рисунок 2.
-
-Чтобы доказать утверждение о схожей динамике туристических потоков и
-отсутствие конкурентной реакции отелей Сардинии в ответ на принятие закона "Макрона" на территории Франции (Корсика)
-
+Чтобы доказать утверждение о схожей динамике туристических потоков до и после 32 недели и
+общий тренд цен на базовый номер до 32 недели
 
 ## Задание 2
 
 ### Установка библиотек
 ```{r, message = FALSE, warning=FALSE}
-if (!require(haven)) { install.packages("haven") }
-if (!require(dplyr)) { install.packages("dplyr") }
-if (!require(lmtest)) { install.packages("lmtest") }
-if (!require(sandwich)) { install.packages("sandwich") }
-if (!require(stargazer)) { install.packages("stargazer") }
-if (!require(fixest)) { install.packages("fixest") }
+# install.packages("haven")
+# install.packages("dplyr")
+# install.packages("lmtest")
+# install.packages("sandwich")
+# install.packages("stargazer")
+# install.packages("Synth")
+# install.packages("gsynth")
+# install.packages("Synth")
+# install.packages("modelr")
+# install.packages("devtools")
+# install.packages("ggplot2")
+# devtools::install_github("edunford/tidysynth")
 
 library(haven)
 library(dplyr)
@@ -34,14 +39,20 @@ library(lmtest)
 library(sandwich)
 library(fixest)
 library(stargazer)
+library("Synth")
+library("gsynth")
+
+library(tidysynth)
+library(modelr)
+library(ggplot2)
 
 ```
 
 ### Загрузка данных
 ```{r}
-data <- read_dta("data/data_mac_sr.dta") %>% filter(sample_mac_sr == 1)
-nrow(data)
-head(data, 2)
+data_task_1 <- read_dta("data/data_mac_sr.dta") %>% filter(sample_mac_sr == 1)
+nrow(data_task_1)
+head(data_task_1, 2)
 set.seed(1)
 ```
 
@@ -50,32 +61,32 @@ set.seed(1)
 Сардиния = region 2
 (по информации из лейбла region внутри датасета)
 ```{r}
-data$Corsica <- ifelse(data$region == 1, 1, 0)
-data$Sardinia <- ifelse(data$region == 2, 1, 0)
-nrow(data %>% filter(Sardinia == 1))
+data_task_1$Corsica <- ifelse(data_task_1$region == 1, 1, 0)
+data_task_1$Sardinia <- ifelse(data_task_1$region == 2, 1, 0)
+nrow(data_task_1 %>% filter(Sardinia == 1))
 ```
 
 ### Добавление дамми сетевого отеля
 ```{r}
-data$Chain <- ifelse(data$dchain == 0, 0, 1)
-data$NoChain <- ifelse(data$dchain == 0, 1, 0)
-nrow(data %>% filter(Chain == 1))
-nrow(data %>% filter(NoChain == 1))
+data_task_1$Chain <- ifelse(data_task_1$dchain == 0, 0, 1)
+data_task_1$NoChain <- ifelse(data_task_1$dchain == 0, 1, 0)
+nrow(data_task_1 %>% filter(Chain == 1))
+nrow(data_task_1 %>% filter(NoChain == 1))
 ```
 ### Добавление дамми размера отеля
 ```{r}
-data$SmallSize <- ifelse(data$capacity < 25, 1, 0)
-data$MediumSize <- ifelse(data$capacity <= 99 & data$capacity >= 25, 1, 0)
-data$LargeSize <- ifelse(data$capacity > 99, 1, 0)
+data_task_1$SmallSize <- ifelse(data_task_1$capacity < 25, 1, 0)
+data_task_1$MediumSize <- ifelse(data_task_1$capacity <= 99 & data_task_1$capacity >= 25, 1, 0)
+data_task_1$LargeSize <- ifelse(data_task_1$capacity > 99, 1, 0)
 ```
 
 ### Добавление дамми звездности
 ```{r}
-data$Star1 <- ifelse(data$stars == 1, 1, 0)
-data$Star2 <- ifelse(data$stars == 2, 1, 0)
-data$Star3 <- ifelse(data$stars == 3, 1, 0)
-data$Star4 <- ifelse(data$stars == 4, 1, 0)
-data$Star5 <- ifelse(data$stars == 5, 1, 0)
+data_task_1$Star1 <- ifelse(data_task_1$stars == 1, 1, 0)
+data_task_1$Star2 <- ifelse(data_task_1$stars == 2, 1, 0)
+data_task_1$Star3 <- ifelse(data_task_1$stars == 3, 1, 0)
+data_task_1$Star4 <- ifelse(data_task_1$stars == 4, 1, 0)
+data_task_1$Star5 <- ifelse(data_task_1$stars == 5, 1, 0)
 ```
 
 ### Модели
@@ -83,7 +94,7 @@ data$Star5 <- ifelse(data$stars == 5, 1, 0)
 # "Обычная" разность разностей
 model_1 <- lm(
   formula = lprice100 ~ Post * Treated,
-  data = data
+  data = data_task_1
 )
 
 # Corsica:bdays, Sardinia:bdays, google_src, town_avail
@@ -93,7 +104,7 @@ model_2 <- lm(
     Sardinia * bdays +
     google_src +
     town_avail,
-  data = data
+  data = data_task_1
 )
 
 #дамми период после введения закона, дамми тритментгруппы, сетевой/несетевой отель
@@ -106,7 +117,7 @@ model_3 <- lm(
     Post * Treated * Chain +
     Post * Treated * NoChain
   ,
-  data = data
+  data = data_task_1
 )
 
 #дамми период после введения закона, дамми тритментгруппы, звездность отеля
@@ -122,7 +133,7 @@ model_4 <- lm(
     Post * Treated * Star4 +
     Post * Treated * Star5
   ,
-  data = data
+  data = data_task_1
 )
 
 #дамми период после введения закона, дамми тритментгруппы, размер отеля
@@ -136,7 +147,7 @@ model_5 <- lm(
     Post * Treated * MediumSize +
     Post * Treated * LargeSize
   ,
-  data = data
+  data = data_task_1
 )
 
 stargazer(
@@ -154,4 +165,161 @@ stargazer(
   omit.stat = c("LL", "ser", "f")
 )
 
+```
+
+## Задание 3
+
+
+## Задание 4
+
+
+## Задание 5
+
+
+# Оценка эффекта синтетическим контролем
+## Задание 1
+
+Подготовка данных
+```{r}
+data_task_2 <- read_dta("data/data_mac_synth.dta") %>% filter(synth_mac == 1)
+data_task_2 <- as.data.frame(data_task_2)
+data_task_2$classification_char <- as.character(data_task_2$classification)
+data_task_2$num_days_start_booking <- as.numeric(data_task_2$date_start_booking - as.Date("2015-01-01"))
+```
+```{r}
+dataprep.out <- dataprep(
+  foo = data_task_2,
+  predictors = c("lprice100", "bdays", "stars", "hot_size", "capacity",
+                 "punteggio", "google_src", "num_days_start_booking"),
+  predictors.op = "mean",
+  dependent = "lprice100",
+  unit.variable = "classification",
+  unit.names.variable = "classification_char",
+  time.variable = "week_src",
+  treatment.identifier = 1,
+  controls.identifier = unique(data_task_2$classification[data_task_2$classification != 1]),
+  time.predictors.prior = 25:31,
+  time.optimize.ssr = 25:31,
+  time.plot = 25:42
+)
+synth.out <- synth(dataprep.out)
+
+print(synth.tab(dataprep.res = dataprep.out, synth.res = synth.out))
+
+pdf("synth_task_2.1.pdf", width = 10, height = 8)
+path.plot(
+  synth.res = synth.out,
+  dataprep.res = dataprep.out,
+  Ylab = "lprice100",
+  Xlab = "Week",
+  Legend.position = "topleft",
+  Ylim = c(420, 500)
+)
+abline(v = 32, lty = 2)
+dev.off()
+```
+График synth_task_2.1.pdf полностью совпадает с Fig.5(a) из статьи (для всех отелей)
+
+
+## Задание 2
+
+Таблица весов Корсики
+```{r}
+data.frame(
+  Control_Units = dataprep.out$tag$unit.names,
+  Weights = synth.out$solution.w
+)
+```
+Средние значения Корсики
+```{r}
+colMeans(dataprep.out$Y0plot)
+```
+
+Среднее значение контрольной группы Корсики
+```{r}
+mean(dataprep.out$Y1plot, na.rm = TRUE)
+```
+
+Среднее значение синтетической группы Корсики
+```{r}
+mean(dataprep.out$Y0plot %*% synth.out$solution.w)
+```
+
+## Задание 3
+```{r}
+placebo_week <- 29
+dataprep.out <- dataprep(
+  foo = data_task_2,
+  predictors = c("lprice100", "bdays", "stars", "hot_size", "capacity",
+                 "punteggio", "google_src", "num_days_start_booking"),
+  predictors.op = "mean",
+  dependent = "lprice100",
+  unit.variable = "classification",
+  unit.names.variable = "classification_char",
+  time.variable = "week_src",
+  treatment.identifier = 1,
+  controls.identifier = unique(data_task_2$classification[data_task_2$classification != 1]),
+  time.predictors.prior = 25:placebo_week,
+  time.optimize.ssr = 25:placebo_week,
+  time.plot = 25:42
+)
+synth.out <- synth(dataprep.out)
+
+pdf("placebo_synth_task_2.3_time.pdf", width = 10, height = 8)
+path.plot(
+  synth.res = synth.out,
+  dataprep.res = dataprep.out,
+  Ylab = "lprice100",
+  Xlab = "Week",
+  Legend.position = "topleft",
+  Ylim = c(420, 500)
+)
+abline(v = placebo_week, lty = 2)
+abline(v = 32, lty = 2)
+dev.off()
+```
+Плацебо было дано на 29 неделе. Из графика placebo_synth_task_2.3_time.pdf видно, что в плацебо-периоде (до 32 недели) не зафиксированы отклонения в тренде, поэтому можно предположить, что зафиксированные изменения после 32 недели обусловлены действиями вмешательства, таким образом подтверждая причину и следствие.
+Так как модель показывает устойчивое поведение это подтверждает, что изменения обусловлены принятием закона Макрона во Франции на 32 неделе
+
+Плацебо тест во времени нужен для проверки надежности модели и подтверждения причинно-следственной связи
+
+## Задание 4
+```{r}
+placebo_treatment_identifier <- 5
+dataprep.out <- dataprep(
+  foo = data_task_2,
+  predictors = c("lprice100", "bdays", "stars", "hot_size", "capacity",
+                 "punteggio", "google_src", "num_days_start_booking"),
+  predictors.op = "mean",
+  dependent = "lprice100",
+  unit.variable = "classification",
+  unit.names.variable = "classification_char",
+  time.variable = "week_src",
+  treatment.identifier = placebo_treatment_identifier,
+  controls.identifier = unique(data_task_2$classification[data_task_2$classification != placebo_treatment_identifier]),
+  time.predictors.prior = 25:32,
+  time.optimize.ssr = 25:32,
+  time.plot = 25:42
+)
+synth.out <- synth(dataprep.out)
+
+pdf("placebo_synth_task_2.4_space.3.pdf", width = 10, height = 8)
+path.plot(
+  synth.res = synth.out,
+  dataprep.res = dataprep.out,
+  Ylab = "lprice100",
+  Xlab = "Week",
+  Legend.position = "topleft",
+  Ylim = c(420, 500)
+)
+abline(v = 32, lty = 2)
+dev.off()
+```
+
+
+Численный критерий качества подгонки
+```{r}
+before <- sqrt(mean((dataprep.out$Y1plot[1:7] - (dataprep.out$Y0plot[1:7] %*% synth.out$solution.w[1:7]))^2))
+after <- sqrt(mean((dataprep.out$Y1plot[8:14] - (dataprep.out$Y0plot[8:14] %*% synth.out$solution.w[8:14]))^2))
+after/before
 ```

@@ -345,7 +345,7 @@ after / before
 all_controls <- unique(data_task_2$classification[data_task_2$classification != 1])
 
 #Критерии подгонки
-rmspe_list <- vector("list", length(all_controls))
+errors_list <- vector("list", length(all_controls))
 for (i in seq_along(all_controls)) {
   controls_without_one <- all_controls[-i]
   dataprep.out <- dataprep(
@@ -374,11 +374,11 @@ for (i in seq_along(all_controls)) {
       (dataprep.out$Y1plot[8:18] - (dataprep.out$Y0plot[8:18,] %*% synth.out$solution.w))^2
     )
   )
-  rmspe_list[i] <- after / before
+  errors_list[i] <- after / before
 }
 ```
 ```{r}
-print(rmspe_list)
+print(errors_list)
 ```
 Полученные результаты подтверждают данные из таблицы весов наблюдений контрольной группы.
 Таким образом выявлена чувствительность к выбору контрольных единиц. Это может быть следствием недостатка наблюдений в контрольной группе которые похожи на тритмент-группу

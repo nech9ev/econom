@@ -882,7 +882,7 @@ region внутри датасета)</p>
 <div class="sourceCode" id="cb33"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb33-1"><a href="#cb33-1" tabindex="-1"></a>all_controls <span class="ot">&lt;-</span> <span class="fu">unique</span>(data_task_2<span class="sc">$</span>classification[data_task_2<span class="sc">$</span>classification <span class="sc">!=</span> <span class="dv">1</span>])</span>
 <span id="cb33-2"><a href="#cb33-2" tabindex="-1"></a></span>
 <span id="cb33-3"><a href="#cb33-3" tabindex="-1"></a><span class="co">#Критерии подгонки</span></span>
-<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>rmspe_list <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">&quot;list&quot;</span>, <span class="fu">length</span>(all_controls))</span>
+<span id="cb33-4"><a href="#cb33-4" tabindex="-1"></a>errors_list <span class="ot">&lt;-</span> <span class="fu">vector</span>(<span class="st">&quot;list&quot;</span>, <span class="fu">length</span>(all_controls))</span>
 <span id="cb33-5"><a href="#cb33-5" tabindex="-1"></a><span class="cf">for</span> (i <span class="cf">in</span> <span class="fu">seq_along</span>(all_controls)) {</span>
 <span id="cb33-6"><a href="#cb33-6" tabindex="-1"></a>  controls_without_one <span class="ot">&lt;-</span> all_controls[<span class="sc">-</span>i]</span>
 <span id="cb33-7"><a href="#cb33-7" tabindex="-1"></a>  dataprep.out <span class="ot">&lt;-</span> <span class="fu">dataprep</span>(</span>
@@ -911,7 +911,7 @@ region внутри датасета)</p>
 <span id="cb33-30"><a href="#cb33-30" tabindex="-1"></a>      (dataprep.out<span class="sc">$</span>Y1plot[<span class="dv">8</span><span class="sc">:</span><span class="dv">18</span>] <span class="sc">-</span> (dataprep.out<span class="sc">$</span>Y0plot[<span class="dv">8</span><span class="sc">:</span><span class="dv">18</span>,] <span class="sc">%*%</span> synth.out<span class="sc">$</span>solution.w))<span class="sc">^</span><span class="dv">2</span></span>
 <span id="cb33-31"><a href="#cb33-31" tabindex="-1"></a>    )</span>
 <span id="cb33-32"><a href="#cb33-32" tabindex="-1"></a>  )</span>
-<span id="cb33-33"><a href="#cb33-33" tabindex="-1"></a>  rmspe_list[i] <span class="ot">&lt;-</span> after <span class="sc">/</span> before</span>
+<span id="cb33-33"><a href="#cb33-33" tabindex="-1"></a>  errors_list[i] <span class="ot">&lt;-</span> after <span class="sc">/</span> before</span>
 <span id="cb33-34"><a href="#cb33-34" tabindex="-1"></a>}</span></code></pre></div>
 <pre><code>## 
 ## X1, X0, Z1, Z0 all come directly from dataprep object.
@@ -1272,7 +1272,7 @@ region внутри датасета)</p>
 ## 
 ## solution.w:
 ##  1.79957e-05 0.4741864 0.0003098749 1.63151e-05 0.191958 8.24e-08 4.4138e-06 0.3334444 2.3604e-06 1.7122e-06 1.1106e-06 1.9925e-06 5.7698e-06 2.89092e-05 3.6167e-06 1.55771e-05 1.5075e-06</code></pre>
-<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a><span class="fu">print</span>(rmspe_list)</span></code></pre></div>
+<div class="sourceCode" id="cb35"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb35-1"><a href="#cb35-1" tabindex="-1"></a><span class="fu">print</span>(errors_list)</span></code></pre></div>
 <pre><code>## [[1]]
 ## [1] 4.81449
 ## 
